@@ -48,7 +48,7 @@ Mit OSSL2Gif kannst du animierte GIFs einfach in Texturen für Second Life/OpenS
 - Im Ordner mit der Datei `main.py` folgenden Befehl ausführen:
 
   ```bash
-  python main.py
+  python start.py
   ```
 
 ## Bedienung
@@ -75,3 +75,4 @@ Mit OSSL2Gif kannst du animierte GIFs einfach in Texturen für Second Life/OpenS
 ## Todo
 
 Einzelbilder oder Bildergruppe zu einer Gif Animation sammeln, damit man sie als Gif oder Textur exportieren kann. (siehe #1)
+
