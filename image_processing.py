@@ -1,6 +1,7 @@
-
 from PIL import Image, ImageTk
+from PIL import ImageColor, ImageEnhance, ImageFilter
 import math
+import os
 
 def show_gif_frame(self):
 	if not self.gif_frames:
@@ -8,10 +9,8 @@ def show_gif_frame(self):
 		self.show_texture()
 		return
 	frame = self.gif_frames[self.current_frame]
-	self.gif_canvas.update_idletasks()
 	canvas_w = self.gif_canvas.winfo_width()
 	canvas_h = self.gif_canvas.winfo_height()
-	self.texture_canvas.update_idletasks()
 	texture_w = self.texture_canvas.winfo_width()
 	texture_h = self.texture_canvas.winfo_height()
 	max_w = min(canvas_w, texture_w) if texture_w > 10 else canvas_w
@@ -27,7 +26,25 @@ def show_gif_frame(self):
 
 def show_texture(self):
 	if not self.gif_frames:
-		self.texture_canvas.config(image="")
+		# Leere Textur erzeugen, damit self.texture_image nicht None ist
+		tex_w = self.width_var.get() if self.width_var.get() > 0 else 2048
+		tex_h = self.height_var.get() if self.height_var.get() > 0 else 2048
+		from PIL import ImageColor
+		try:
+			bg_rgba = ImageColor.getcolor(getattr(self, 'bg_color', '#00000000'), "RGBA")
+		except Exception:
+			bg_rgba = (0,0,0,0)
+		sheet = Image.new("RGBA", (tex_w, tex_h), bg_rgba)
+		self.texture_image = sheet
+		canvas_w = self.texture_canvas.winfo_width()
+		canvas_h = self.texture_canvas.winfo_height()
+		if canvas_w < 10 or canvas_h < 10:
+			canvas_w, canvas_h = 256, 256
+		preview = sheet.resize((canvas_w, canvas_h), Image.Resampling.LANCZOS)
+		# ImageTk wird am Dateianfang importiert
+		img = ImageTk.PhotoImage(preview)
+		self._texture_img_ref = img
+		self.texture_canvas.config(image=img)
 		return
 	import math, os
 	tex_w = self.width_var.get() if self.width_var.get() > 0 else 2048
@@ -44,20 +61,34 @@ def show_texture(self):
 	except Exception:
 		pass
 	sheet = Image.new("RGBA", (tex_w, tex_h), bg_rgba)
-	for idx, frame in enumerate(self.gif_frames):
-		tx = idx % tiles_x
-		ty = idx // tiles_x
-		f = frame.resize((tile_w, tile_h), Image.Resampling.LANCZOS)
-		f = apply_effects(self, f, prefix="texture")
-		x = tx * tile_w
-		y = ty * tile_h
-		sheet.paste(f, (x, y))
+	try:
+		for idx, frame in enumerate(self.gif_frames):
+			tx = idx % tiles_x
+			ty = idx // tiles_x
+			f = frame.resize((tile_w, tile_h), Image.Resampling.LANCZOS)
+			f = apply_effects(self, f, prefix="texture")
+			x = tx * tile_w
+			y = ty * tile_h
+			sheet.paste(f, (x, y))
+	except Exception as e:
+		# Fehler beim Erstellen der Textur: Leere Textur erzeugen
+		sheet = Image.new("RGBA", (tex_w, tex_h), bg_rgba)
+		self.texture_image = sheet
+		canvas_w = self.texture_canvas.winfo_width()
+		canvas_h = self.texture_canvas.winfo_height()
+		if canvas_w < 10 or canvas_h < 10:
+			canvas_w, canvas_h = 256, 256
+		preview = sheet.resize((canvas_w, canvas_h), Image.Resampling.LANCZOS)
+		# ImageTk wird am Dateianfang importiert
+		img = ImageTk.PhotoImage(preview)
+		self._texture_img_ref = img
+		self.texture_canvas.config(image=img)
+		return
 	if hasattr(self, 'borderless_var') and self.borderless_var.get():
 		bbox = sheet.getbbox()
 		if bbox:
 			sheet = sheet.crop(bbox)
 	self.texture_image = sheet
-	self.texture_canvas.update_idletasks()
 	canvas_w = self.texture_canvas.winfo_width()
 	canvas_h = self.texture_canvas.winfo_height()
 	if canvas_w < 10 or canvas_h < 10:

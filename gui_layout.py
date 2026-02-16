@@ -13,31 +13,37 @@ def create_effects_panel(self, parent, prefix):
 	self.__dict__[f'{prefix}_transparency_value'] = tk.DoubleVar(value=0.5)
 	self.__dict__[f'{prefix}_sharpen_value'] = tk.DoubleVar(value=2.5)
 	self.__dict__[f'{prefix}_blur_value'] = tk.DoubleVar(value=3.5)
-	ttk.Checkbutton(frame, text=tr('effect_grayscale', self.lang) or "", variable=self.__dict__[f'{prefix}_grayscale'], command=self.update_previews).pack(anchor="w")
+	grayscale_check = ttk.Checkbutton(frame, text=tr('effect_grayscale', self.lang) or "", variable=self.__dict__[f'{prefix}_grayscale'])
+	grayscale_check.pack(anchor="w")
+	self.__dict__[f'{prefix}_grayscale_check'] = grayscale_check
 	# Schärfen
 	sharpen_row = ttk.Frame(frame)
 	sharpen_row.pack(fill=tk.X, pady=1)
 	sharpen_row.columnconfigure(0, weight=1)
-	sharpen_check = ttk.Checkbutton(sharpen_row, text=tr('effect_sharpen', self.lang) or "", variable=self.__dict__[f'{prefix}_sharpen'], command=self.update_previews)
+	sharpen_check = ttk.Checkbutton(sharpen_row, text=tr('effect_sharpen', self.lang) or "", variable=self.__dict__[f'{prefix}_sharpen'])
 	sharpen_check.pack(side=tk.LEFT)
+	self.__dict__[f'{prefix}_sharpen_check'] = sharpen_check
 	sharpen_value_label = ttk.Label(sharpen_row, textvariable=self.__dict__[f'{prefix}_sharpen_value'], width=4)
 	sharpen_value_label.pack(side=tk.LEFT, padx=(5,0))
 	sharpen_inner = ttk.Frame(sharpen_row)
 	sharpen_inner.pack(anchor="e", pady=(0,2), fill=tk.X)
-	sharpen_scale = ttk.Scale(sharpen_inner, from_=0.0, to=10.0, orient=tk.HORIZONTAL, variable=self.__dict__[f'{prefix}_sharpen_value'], command=lambda e: self.update_previews(), length=375)
+	sharpen_scale = ttk.Scale(sharpen_inner, from_=0.0, to=10.0, orient=tk.HORIZONTAL, variable=self.__dict__[f'{prefix}_sharpen_value'], length=375)
 	sharpen_scale.pack(side=tk.RIGHT, padx=5)
+	self.__dict__[f'{prefix}_sharpen_scale'] = sharpen_scale
 	# Weichzeichnen
 	blur_row = ttk.Frame(frame)
 	blur_row.pack(fill=tk.X, pady=1)
 	blur_row.columnconfigure(0, weight=1)
-	blur_check = ttk.Checkbutton(blur_row, text=tr('effect_blur', self.lang) or "", variable=self.__dict__[f'{prefix}_blur'], command=self.update_previews)
+	blur_check = ttk.Checkbutton(blur_row, text=tr('effect_blur', self.lang) or "", variable=self.__dict__[f'{prefix}_blur'])
 	blur_check.pack(side=tk.LEFT)
+	self.__dict__[f'{prefix}_blur_check'] = blur_check
 	blur_value_label = ttk.Label(blur_row, textvariable=self.__dict__[f'{prefix}_blur_value'], width=4)
 	blur_value_label.pack(side=tk.LEFT, padx=(5,0))
 	blur_inner = ttk.Frame(blur_row)
 	blur_inner.pack(anchor="e", pady=(0,2), fill=tk.X)
-	blur_scale = ttk.Scale(blur_inner, from_=0.0, to=10.0, orient=tk.HORIZONTAL, variable=self.__dict__[f'{prefix}_blur_value'], command=lambda e: self.update_previews(), length=375)
+	blur_scale = ttk.Scale(blur_inner, from_=0.0, to=10.0, orient=tk.HORIZONTAL, variable=self.__dict__[f'{prefix}_blur_value'], length=375)
 	blur_scale.pack(side=tk.RIGHT, padx=5)
+	self.__dict__[f'{prefix}_blur_scale'] = blur_scale
 	# Transparenz
 	transparency_row = ttk.Frame(frame)
 	transparency_row.pack(fill=tk.X, pady=1)
@@ -45,14 +51,16 @@ def create_effects_panel(self, parent, prefix):
 	transparency_label = tr('effect_transparency', self.lang)
 	if not transparency_label:
 		transparency_label = "Transparenz"
-	transparency_check = ttk.Checkbutton(transparency_row, text=transparency_label, variable=self.__dict__[f'{prefix}_transparency'], command=self.update_previews)
+	transparency_check = ttk.Checkbutton(transparency_row, text=transparency_label, variable=self.__dict__[f'{prefix}_transparency'])
 	transparency_check.pack(side=tk.LEFT)
+	self.__dict__[f'{prefix}_transparency_check'] = transparency_check
 	transparency_value_label = ttk.Label(transparency_row, textvariable=self.__dict__[f'{prefix}_transparency_value'], width=4)
 	transparency_value_label.pack(side=tk.LEFT, padx=(5,0))
 	transparency_inner = ttk.Frame(transparency_row)
 	transparency_inner.pack(anchor="e", pady=(0,2), fill=tk.X)
-	transparency_scale = ttk.Scale(transparency_inner, from_=0.0, to=1.0, orient=tk.HORIZONTAL, variable=self.__dict__[f'{prefix}_transparency_value'], command=lambda e: self.update_previews(), length=375)
+	transparency_scale = ttk.Scale(transparency_inner, from_=0.0, to=1.0, orient=tk.HORIZONTAL, variable=self.__dict__[f'{prefix}_transparency_value'], length=375)
 	transparency_scale.pack(side=tk.RIGHT, padx=5)
+	self.__dict__[f'{prefix}_transparency_scale'] = transparency_scale
 
 	# Farbintensität (Pastell <-> Kräftig) mit Checkbox
 	colorint_row = ttk.Frame(frame)
@@ -61,14 +69,16 @@ def create_effects_panel(self, parent, prefix):
 	colorint_label = tr('effect_colorintensity', self.lang) or "Farbintensität"
 	self.__dict__[f'{prefix}_colorintensity'] = tk.DoubleVar(value=0.5)
 	self.__dict__[f'{prefix}_colorintensity_active'] = tk.IntVar(value=0)
-	colorint_check = ttk.Checkbutton(colorint_row, text=colorint_label, variable=self.__dict__[f'{prefix}_colorintensity_active'], command=self.update_previews)
+	colorint_check = ttk.Checkbutton(colorint_row, text=colorint_label, variable=self.__dict__[f'{prefix}_colorintensity_active'])
 	colorint_check.pack(side=tk.LEFT)
+	self.__dict__[f'{prefix}_colorint_check'] = colorint_check
 	colorint_value_label = ttk.Label(colorint_row, textvariable=self.__dict__[f'{prefix}_colorintensity'], width=4)
 	colorint_value_label.pack(side=tk.LEFT, padx=(5,0))
 	colorint_inner = ttk.Frame(colorint_row)
 	colorint_inner.pack(anchor="e", pady=(0,2), fill=tk.X)
-	colorint_scale = ttk.Scale(colorint_inner, from_=0.0, to=1.0, orient=tk.HORIZONTAL, variable=self.__dict__[f'{prefix}_colorintensity'], command=lambda e: self.update_previews(), length=375)
+	colorint_scale = ttk.Scale(colorint_inner, from_=0.0, to=1.0, orient=tk.HORIZONTAL, variable=self.__dict__[f'{prefix}_colorintensity'], length=375)
 	colorint_scale.pack(side=tk.RIGHT, padx=5)
+	self.__dict__[f'{prefix}_colorint_scale'] = colorint_scale
 	return frame
 
 def build_layout(self):
@@ -94,6 +104,12 @@ def build_layout(self):
 	self.gif_canvas = tk.Label(left, bg="#222", width=40, height=16, relief=tk.SUNKEN)
 	self.gif_canvas.pack(fill=tk.BOTH, expand=True)
 	self.tooltips['gif_canvas'] = ToolTip(self.gif_canvas, tr('tt_gif_canvas', self.lang))
+	# Mouse-Binding für GIF-Vorschau: Bei Klick GIF neu anzeigen
+	def reload_gif_and_refresh_texture(event=None):
+		self.load_gif()
+		from image_processing import show_texture
+		show_texture(self)
+	self.gif_canvas.bind('<Button-1>', reload_gif_and_refresh_texture)
 	self.gif_settings = self.create_effects_panel(left, prefix="gif")
 	self.gif_settings.pack(fill=tk.X, pady=10)
 	self.tooltips['gif_settings'] = ToolTip(self.gif_settings, tr('tt_gif_settings', self.lang))
@@ -107,6 +123,11 @@ def build_layout(self):
 	self.texture_canvas = tk.Label(right, bg="#222", width=40, height=16, relief=tk.SUNKEN)
 	self.texture_canvas.pack(fill=tk.BOTH, expand=True)
 	self.tooltips['texture_canvas'] = ToolTip(self.texture_canvas, tr('tt_texture_canvas', self.lang))
+	# Mouse-Binding für Textur-Vorschau: Bei Klick Textur neu generieren
+	def refresh_texture(event=None):
+		from image_processing import show_texture
+		show_texture(self)
+	self.texture_canvas.bind('<Button-1>', refresh_texture)
 	self.texture_settings = self.create_effects_panel(right, prefix="texture")
 	self.texture_settings.pack(fill=tk.X, pady=10)
 	self.tooltips['texture_settings'] = ToolTip(self.texture_settings, tr('tt_texture_settings', self.lang))
@@ -213,8 +234,7 @@ def build_layout(self):
 	self.height_entry = ttk.Entry(size_row, textvariable=self.height_var, width=5)
 	self.height_entry.pack(side=tk.LEFT, padx=2)
 	self.tooltips['height_entry'] = ToolTip(self.height_entry, tr('tt_height_entry', self.lang))
-	self.width_entry.bind('<FocusOut>', lambda e: self.update_previews())
-	self.height_entry.bind('<FocusOut>', lambda e: self.update_previews())
+	# Bindings werden in main.py gesetzt
 	# Bildrate
 	framerate_row = ttk.Frame(left_frame)
 	framerate_row.pack(fill=tk.X, pady=(4,2))
@@ -235,8 +255,7 @@ def build_layout(self):
 	self.maxframes_spin = ttk.Spinbox(maxframes_row, from_=1, to=1024, increment=1, textvariable=self.maxframes_var, width=5, state="readonly")
 	self.maxframes_spin.pack(side=tk.LEFT)
 	self.tooltips['maxframes_spin'] = ToolTip(self.maxframes_spin, tr('tt_maxframes_spin', self.lang))
-	self.maxframes_spin.bind('<FocusOut>', lambda e: self.on_maxframes_changed())
-	self.maxframes_var.trace_add('write', self.on_maxframes_changed)
+	# Bindings werden in main.py gesetzt
 	# Mittlerer Rahmen: Hintergrundfarbe, Randlos, Bild hinzufügen (jeweils Label/Checkbutton links, Wert/Button rechts)
 	middle_frame = ttk.LabelFrame(master_row)
 	middle_frame.pack(side=tk.LEFT, padx=5, fill=tk.Y)
@@ -250,13 +269,13 @@ def build_layout(self):
 	self.bg_box_color = "#000000"
 	self.bg_color_box = tk.Label(bg_row, width=3, relief=tk.SUNKEN, bg=self.bg_box_color, cursor="hand2")
 	self.bg_color_box.pack(side=tk.LEFT, padx=2)
-	self.bg_color_box.bind("<Button-1>", self.choose_bg_color)
+	# Bindings werden in main.py gesetzt
 	self.tooltips['bg_color_box'] = ToolTip(self.bg_color_box, tr('tt_bg_color_box', self.lang))
 	# Randlos
 	borderless_row = ttk.Frame(middle_frame)
 	borderless_row.pack(fill=tk.X, pady=(4,2))
 	self.borderless_var = tk.IntVar(value=0)
-	self.borderless_var.trace_add('write', lambda *args: self.update_previews())
+	# Bindings werden in main.py gesetzt
 	self.borderless_label = ttk.Label(
 		borderless_row,
 		text=tr('borderless', self.lang) or "Randlos:",
@@ -270,7 +289,7 @@ def build_layout(self):
 	)
 	self.borderless_label.pack(side=tk.LEFT, padx=(0,4), ipady=6)
 	self.tooltips['borderless_label'] = ToolTip(self.borderless_label, tr('tt_borderless', self.lang))
-	self.borderless_chk = ttk.Checkbutton(borderless_row, text="", variable=self.borderless_var, command=self.update_previews)
+	self.borderless_chk = ttk.Checkbutton(borderless_row, text="", variable=self.borderless_var)
 	self.borderless_chk.pack(side=tk.LEFT)
 	try:
 		self.borderless_chk.configure(style="PastellBorderless.TCheckbutton")
@@ -281,12 +300,13 @@ def build_layout(self):
 	# Bild hinzufügen
 	add_row = ttk.Frame(middle_frame)
 	add_row.pack(fill=tk.X, pady=(4,2))
-	self.add_frame_btn = ttk.Button(add_row, text=tr('add_frame', self.lang) or "", command=self.add_selected_frame_to_texture)
-	self.add_frame_btn.pack(side=tk.LEFT, padx=(0,4))
-	self.tooltips['add_frame_btn'] = ToolTip(self.add_frame_btn, tr('tt_add_frame_btn', self.lang))
+	self.add_row = add_row  # Referenz speichern
 	self.frame_select_spin = ttk.Spinbox(add_row, from_=0, to=0, textvariable=self.frame_select_var, width=5, state="readonly")
-	self.frame_select_spin.pack(side=tk.LEFT)
+	self.frame_select_spin.pack(side=tk.RIGHT)
 	self.tooltips['frame_select_spin'] = ToolTip(self.frame_select_spin, tr('tt_frame_select_spin', self.lang))
+	self.add_frame_btn = ttk.Button(add_row, text=tr('add_frame', self.lang) or "")
+	self.add_frame_btn.pack(side=tk.RIGHT, padx=(0,4))
+	self.tooltips['add_frame_btn'] = ToolTip(self.add_frame_btn, tr('tt_add_frame_btn', self.lang))
 	# Rechter Rahmen: Sprache, Reset (jeweils Label links, Wert/Button rechts)
 	right_frame = ttk.LabelFrame(master_row)
 	right_frame.pack(side=tk.LEFT, padx=5, fill=tk.Y)
@@ -300,16 +320,16 @@ def build_layout(self):
 	self.lang_combo = ttk.Combobox(lang_row, values=['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt'], textvariable=self.lang_var, width=6, state="readonly")
 	self.lang_combo.pack(side=tk.LEFT)
 	self.tooltips['lang_combo'] = ToolTip(self.lang_combo, tr('tt_lang_combo', self.lang))
-	self.lang_combo.bind("<<ComboboxSelected>>", self.change_language)
+	# Bindings werden in main.py gesetzt
 	# Reset
 	reset_row = ttk.Frame(right_frame)
 	reset_row.pack(fill=tk.X, pady=(8,2))
 	if THEME_AVAILABLE and tb is not None:
 		style = tb.Style()
 		style.configure("RedReset.TButton", background="#e53935", foreground="white")
-		self.reset_btn = tb.Button(reset_row, text="Reset", command=self.reset_settings, style="RedReset.TButton")
+		self.reset_btn = tb.Button(reset_row, text="Reset", style="RedReset.TButton")
 	else:
-		self.reset_btn = tk.Button(reset_row, text="Reset", command=self.reset_settings, bg="#e53935", fg="white", activebackground="#b71c1c", activeforeground="white")
+		self.reset_btn = tk.Button(reset_row, text="Reset", bg="#e53935", fg="white", activebackground="#b71c1c", activeforeground="white")
 	self.reset_btn.pack(side=tk.LEFT, padx=8)
 	self.tooltips['reset_btn'] = ToolTip(self.reset_btn, tr('tt_reset_btn', self.lang))
 
@@ -320,4 +340,5 @@ def build_layout(self):
 	self.status.pack(fill=tk.X)
 
 	# Übersetzung für Randlos-Label und Tooltip erfolgt ausschließlich in update_language für Konsistenz
+
 

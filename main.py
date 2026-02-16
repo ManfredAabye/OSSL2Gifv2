@@ -8,7 +8,6 @@ import math
 import atexit
 from config import load_config, save_config
 from translations import tr
-from tooltip import ToolTip
 from gui_layout import build_layout, create_effects_panel
 from image_processing import apply_effects, show_gif_frame, show_texture, update_previews
 from file_ops import load_gif, save_gif, save_texture, export_lsl, generate_lsl_script
@@ -62,6 +61,25 @@ except ImportError:
 LANGUAGES = ['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt']
 
 class ModernApp:
+
+    def show_texture(self):
+        # Kompatibilitäts-Wrapper, damit show_texture(self) immer funktioniert
+        if hasattr(self, '_update_texture'):
+            self._update_texture()
+
+    # Methoden aus file_ops an die Instanz binden, falls nicht schon vorhanden
+    def _ensure_file_ops_methods(self):
+        from file_ops import _load_gif_frames, _setup_frame_select, _reset_play_button, _update_status, _update_preview
+        from image_processing import show_texture
+        self._load_gif_frames = _load_gif_frames.__get__(self)
+        self._setup_frame_select = _setup_frame_select.__get__(self)
+        self._reset_play_button = _reset_play_button.__get__(self)
+        self._update_status = _update_status.__get__(self)
+        self._update_preview = _update_preview.__get__(self)
+        self._update_texture = show_texture.__get__(self)
+        # Kein automatisches Anzeigen der Textur hier – dies erfolgt gezielt nach GIF-Ladevorgängen
+
+
     def __init__(self, root):
         self.root = root
         # Sprache initial aus Combobox übernehmen, falls vorhanden, sonst Standard
@@ -77,40 +95,55 @@ class ModernApp:
         self.image_height = 2048
         self.root.title("OSSL2Gif")
         self.root.geometry("1500x1300")
-        # Initialisiere alle dynamisch gesetzten GUI-Attribute auf None für Pylance
-        self.size_label = None
-        self.lang_label = None
+        
+        # Initialize dynamically set GUI attributes
+        self.gif_label = None
+        self.gif_canvas = None
+        self.gif_settings = None
+        self.texture_label = None
+        self.texture_canvas = None
+        self.texture_settings = None
+        self.status = None
+        self.status_group = None
+        self.file_group = None
+        self.master_group = None
+        self.width_entry = None
+        self.width_var = tk.IntVar(value=2048)
+        self.height_entry = None
+        self.height_var = tk.IntVar(value=2048)
         self.load_btn = None
         self.save_gif_btn = None
         self.save_texture_btn = None
         self.export_lsl_btn = None
-        self.master_group = None
-        self.media_group = None
         self.clear_btn = None
-        self.borderless_chk = None
-        self.borderless_label = None
-        self.play_btn = None
-        self.add_frame_btn = None
-        self.framerate_label = None
-        self.export_format_label = None
-        self.maxframes_label = None
-        self.framerate_var = tk.IntVar(value=10)
-        self.width_var = tk.IntVar(value=self.image_width)
-        self.height_var = tk.IntVar(value=self.image_height)
-        self.borderless_var = tk.IntVar(value=0)
-        self.export_format_var = tk.StringVar(value='PNG')
-        self.maxframes_var = tk.IntVar(value=64)
+        self.size_label = None
         self.bg_label = None
         self.bg_color_box = None
-        self.gif_label = None
-        self.gif_settings = None
-        self.texture_label = None
-        self.texture_settings = None
-        self.status = None
-        self.status_group = None
-        self.texture_canvas = None
-        self.gif_canvas = None
-        self.file_group = None
+        self.bg_color = '#000000'
+        self.bg_box_color = '#000000'
+        self.framerate_label = None
+        self.framerate_var = tk.IntVar(value=10)
+        self.framerate_spin = None
+        self.lang_label = None
+        self.lang_combo = None
+        self.frame_select_spin = None
+        self.add_frame_btn = None
+        self.maxframes_label = None
+        self.maxframes_var = tk.IntVar(value=64)
+        self.maxframes_spin = None
+        self.reset_btn = None
+        self.media_group = None
+        self.prev_btn = None
+        self.pause_btn = None
+        self.play_btn = None
+        self.stop_btn = None
+        self.next_btn = None
+        self.borderless_label = None
+        self.borderless_var = tk.IntVar(value=0)
+        self.borderless_chk = None
+        self.export_format_label = None
+        self.export_format_var = tk.StringVar(value='PNG')
+        self.playing = False
         try:
             self.root.iconbitmap("icon.ico")
         except Exception:
@@ -131,6 +164,79 @@ class ModernApp:
         self.update_language()
         # Beim Beenden speichern
         atexit.register(self.save_config)
+        
+        # --- Event-Bindings zentral setzen ---
+        # Effekte-Panel (GIF)
+        if self.gif_settings is not None and hasattr(self.gif_settings, 'grayscale_check'):
+            self.gif_settings.grayscale_check.config(command=lambda: update_previews(self))
+        if self.gif_settings is not None and hasattr(self.gif_settings, 'sharpen_check'):
+            self.gif_settings.sharpen_check.config(command=lambda: update_previews(self))
+        if self.gif_settings is not None and hasattr(self.gif_settings, 'sharpen_scale'):
+            self.gif_settings.sharpen_scale.config(command=lambda e: update_previews(self))
+        if self.gif_settings is not None and hasattr(self.gif_settings, 'blur_check'):
+            self.gif_settings.blur_check.config(command=lambda: update_previews(self))
+        if self.gif_settings is not None and hasattr(self.gif_settings, 'blur_scale'):
+            self.gif_settings.blur_scale.config(command=lambda e: update_previews(self))
+        if self.gif_settings is not None and hasattr(self.gif_settings, 'transparency_check'):
+            self.gif_settings.transparency_check.config(command=lambda: update_previews(self))
+        if self.gif_settings is not None and hasattr(self.gif_settings, 'transparency_scale'):
+            self.gif_settings.transparency_scale.config(command=lambda e: update_previews(self))
+        if self.gif_settings is not None and hasattr(self.gif_settings, 'colorint_check'):
+            self.gif_settings.colorint_check.config(command=lambda: update_previews(self))
+        if self.gif_settings is not None and hasattr(self.gif_settings, 'colorint_scale'):
+            self.gif_settings.colorint_scale.config(command=lambda e: update_previews(self))
+
+        # Effekte-Panel (Textur)
+        if self.texture_settings is not None and hasattr(self.texture_settings, 'grayscale_check'):
+            self.texture_settings.grayscale_check.config(command=lambda: update_previews(self))
+        if self.texture_settings is not None and hasattr(self.texture_settings, 'sharpen_check'):
+            self.texture_settings.sharpen_check.config(command=lambda: update_previews(self))
+        if self.texture_settings is not None and hasattr(self.texture_settings, 'sharpen_scale'):
+            self.texture_settings.sharpen_scale.config(command=lambda e: update_previews(self))
+        if self.texture_settings is not None and hasattr(self.texture_settings, 'blur_check'):
+            self.texture_settings.blur_check.config(command=lambda: update_previews(self))
+        if self.texture_settings is not None and hasattr(self.texture_settings, 'blur_scale'):
+            self.texture_settings.blur_scale.config(command=lambda e: update_previews(self))
+        if self.texture_settings is not None and hasattr(self.texture_settings, 'transparency_check'):
+            self.texture_settings.transparency_check.config(command=lambda: update_previews(self))
+        if self.texture_settings is not None and hasattr(self.texture_settings, 'transparency_scale'):
+            self.texture_settings.transparency_scale.config(command=lambda e: update_previews(self))
+        if self.texture_settings is not None and hasattr(self.texture_settings, 'colorint_check'):
+            self.texture_settings.colorint_check.config(command=lambda: update_previews(self))
+        if self.texture_settings is not None and hasattr(self.texture_settings, 'colorint_scale'):
+            self.texture_settings.colorint_scale.config(command=lambda e: update_previews(self))
+
+        # Bildgröße-Eingaben
+        if self.width_entry is not None:
+            self.width_entry.bind('<FocusOut>', lambda e: update_previews(self))
+        if self.height_entry is not None:
+            self.height_entry.bind('<FocusOut>', lambda e: update_previews(self))
+
+        # Maxframes
+        if self.maxframes_spin is not None:
+            self.maxframes_spin.bind('<FocusOut>', lambda e: on_maxframes_changed(self))
+        self.maxframes_var.trace_add('write', lambda *args: on_maxframes_changed(self))
+
+        # Hintergrundfarbe
+        if self.bg_color_box is not None:
+            self.bg_color_box.bind('<Button-1>', lambda e: choose_bg_color(self, e))
+
+        # Randlos
+        self.borderless_var.trace_add('write', lambda *args: update_previews(self))
+        if self.borderless_chk is not None:
+            self.borderless_chk.config(command=lambda: update_previews(self))
+
+        # Bild hinzufügen
+        if self.add_frame_btn is not None:
+            self.add_frame_btn.config(command=lambda: add_selected_frame_to_texture(self))
+
+        # Sprache
+        if self.lang_combo is not None:
+            self.lang_combo.bind('<<ComboboxSelected>>', lambda e: change_language(self, e))
+
+        # Reset
+        if self.reset_btn is not None:
+            self.reset_btn.config(command=lambda: reset_settings(self))
 
     def get_config(self):
         # Alle relevanten Einstellungen als dict zurückgeben
@@ -217,7 +323,7 @@ class ModernApp:
         if not self.playing or not self.gif_frames:
             return
         self.current_frame = (self.current_frame + 1) % self.frame_count
-        self.show_gif_frame()
+        show_gif_frame(self)
         delay = self.framerate_var.get() if self.framerate_var is not None else 100
         self.root.after(delay, self._run_animation)
 
@@ -230,7 +336,7 @@ class ModernApp:
     def stop_animation(self):
         self.playing = False
         self.current_frame = 0
-        self.show_gif_frame()
+        show_gif_frame(self)
         # Play/Pause-Button immer auf "Abspielen" (Play) setzen, auch sprachabhängig
         if self.play_btn is not None:
             self.play_btn.config(text=tr('play', self.lang) or "Play ▶")
@@ -239,13 +345,13 @@ class ModernApp:
         if not self.gif_frames:
             return
         self.current_frame = (self.current_frame + 1) % self.frame_count
-        self.show_gif_frame()
+        show_gif_frame(self)
 
     def step_backward(self):
         if not self.gif_frames:
             return
         self.current_frame = (self.current_frame - 1) % self.frame_count
-        self.show_gif_frame()
+        show_gif_frame(self)
 
 
 
@@ -391,7 +497,9 @@ class ModernApp:
 
 
     def load_gif(self):
-        load_gif(self)
+        self._ensure_file_ops_methods()
+        from file_ops import load_gif_compat
+        load_gif_compat(self)
 
 
     def clear_texture(self):
@@ -407,20 +515,7 @@ class ModernApp:
         self._gif_img_ref = None
 
 
-    def show_gif_frame(self):
-        show_gif_frame(self)
-
-
-    def show_texture(self):
-        show_texture(self)
-
-
-    def update_previews(self):
-        update_previews(self)
-
-
-    def apply_effects(self, img, prefix):
-        return apply_effects(self, img, prefix)
+    # Bildverarbeitungsfunktionen werden direkt aus image_processing.py importiert und verwendet
 
 
     def save_gif(self):

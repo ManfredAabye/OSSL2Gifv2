@@ -2,6 +2,7 @@
 from tkinter import messagebox, colorchooser, ttk
 from PIL import Image
 from translations import tr
+from image_processing import show_gif_frame, update_previews
 
 def reset_settings(self):
 	self.width_var.set(2048)
@@ -47,9 +48,9 @@ def reset_settings(self):
 		self.frame_count = len(self.gif_frames)
 		self.current_frame = 0
 		if self.gif_frames:
-			self.show_gif_frame()
+			show_gif_frame(self)
 	else:
-		self.update_previews()
+		update_previews(self)
 
 def on_maxframes_changed(self, *args):
 	max_frames = self.maxframes_var.get()
@@ -60,10 +61,14 @@ def on_maxframes_changed(self, *args):
 		self.status.config(text=f"{removed} Bilder entfernt. Gesamt: {self.frame_count}")
 		value = self.frame_select_var.get()
 		self.frame_select_spin.destroy()
-		self.frame_select_spin = ttk.Spinbox(self.add_frame_btn.master, from_=0, to=max(0, self.frame_count-1), textvariable=self.frame_select_var, width=5, state="readonly")
-		self.frame_select_spin.pack(side="left", padx=2, before=self.add_frame_btn)
+		self.frame_select_spin = ttk.Spinbox(self.add_row, from_=0, to=max(0, self.frame_count-1), textvariable=self.frame_select_var, width=5, state="readonly")
+		# Beide Widgets neu packen, Reihenfolge: erst Spinbox, dann Button
+		self.add_frame_btn.pack_forget()
+		self.frame_select_spin.pack_forget()
+		self.frame_select_spin.pack(side="right")
+		self.add_frame_btn.pack(side="right", padx=(0,4))
 		self.frame_select_var.set(min(value, self.frame_count-1))
-		self.update_previews()
+		update_previews(self)
 
 def choose_bg_color(self, event=None):
 	color = colorchooser.askcolor(color=self.bg_box_color, title="Hintergrundfarbe wählen")
@@ -74,7 +79,7 @@ def choose_bg_color(self, event=None):
 		else:
 			self.bg_color = self.bg_box_color
 		self.bg_color_box.config(bg=self.bg_box_color)
-		self.update_previews()
+		update_previews(self)
 
 def add_selected_frame_to_texture(self):
 	idx = self.frame_select_var.get()
@@ -90,13 +95,17 @@ def add_selected_frame_to_texture(self):
 	self.frame_count = len(self.gif_frames)
 	value = self.frame_select_var.get()
 	self.frame_select_spin.destroy()
-	self.frame_select_spin = ttk.Spinbox(self.add_frame_btn.master, from_=0, to=max(0, self.frame_count-1), textvariable=self.frame_select_var, width=5, state="readonly")
-	self.frame_select_spin.pack(side="left", padx=2, before=self.add_frame_btn)
+	self.frame_select_spin = ttk.Spinbox(self.add_row, from_=0, to=max(0, self.frame_count-1), textvariable=self.frame_select_var, width=5, state="readonly")
+	# Beide Widgets neu packen, Reihenfolge: erst Spinbox, dann Button
+	self.add_frame_btn.pack_forget()
+	self.frame_select_spin.pack_forget()
+	self.frame_select_spin.pack(side="right")
+	self.add_frame_btn.pack(side="right", padx=(0,4))
 	self.frame_select_var.set(value)
 	self.status.config(text=f"Bild {idx} hinzugefügt. Gesamt: {self.frame_count}")
-	self.update_previews()
+	update_previews(self)
 
 def change_language(self, event=None):
 	self.lang = self.lang_var.get()
 	self.update_language()  # Tooltips und Labels übersetzen
-	self.update_previews()  # Previews ggf. neu zeichnen
+	update_previews(self)
