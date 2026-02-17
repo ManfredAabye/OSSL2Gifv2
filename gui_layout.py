@@ -1,4 +1,8 @@
-
+###
+# gui_layout.py
+# This file contains the layout and GUI components for the OSSL2Gif application.
+# Version 2.0.0 © 2026 by Manfred Zainhofer
+###
 import tkinter as tk
 from tkinter import ttk
 from translations import tr
@@ -136,7 +140,7 @@ def build_layout(self):
 	self.master_group = ttk.LabelFrame(main, text=tr('master_settings', self.lang) or "Master Einstellungen")
 	self.master_group.pack(fill=tk.X, padx=10, pady=(12,2))
 
-	# --- Media Gruppe ---
+	# --- Media ---
 	self.media_group = ttk.LabelFrame(main, text=tr('media', self.lang) or "Media")
 	self.media_group.pack(fill=tk.X, padx=10, pady=(12,2))
 
@@ -182,10 +186,21 @@ def build_layout(self):
 		self.clear_btn = tk.Button(self.file_group, text=tr('clear', self.lang) or "", command=self.clear_texture, bg="#e53935", fg="white", activebackground="#b71c1c", activeforeground="white")
 	self.clear_btn.pack(side=tk.LEFT, padx=2, pady=2)
 	self.tooltips['clear_btn'] = ToolTip(self.clear_btn, tr('tt_clear_btn', self.lang))
-	# --- Media Gruppe Controls ---
+	# --- Media Controls ---
 	media_row = ttk.Frame(self.media_group)
 	media_row.pack(fill=tk.X)
 	self.playing = False
+
+	# Geschwindigkeit/Framerate-Slider für Media Play
+	framerate_row = ttk.Frame(self.media_group)
+	framerate_row.pack(fill=tk.X, pady=(4,2))
+	self.media_framerate_label = ttk.Label(framerate_row, text=tr('framerate', self.lang) or "Framerate:", width=12, anchor="w")
+	self.media_framerate_label.pack(side=tk.LEFT, padx=(0,4))
+	self.media_framerate_var = tk.IntVar(value=100)
+	self.media_framerate_slider = ttk.Scale(framerate_row, from_=10, to=1000, orient=tk.HORIZONTAL, variable=self.media_framerate_var, length=120)
+	self.media_framerate_slider.pack(side=tk.LEFT, padx=4)
+	self.media_framerate_value = ttk.Label(framerate_row, textvariable=self.media_framerate_var, width=4)
+	self.media_framerate_value.pack(side=tk.LEFT)
 	if THEME_AVAILABLE and tb is not None:
 		style = tb.Style()
 		style.configure("PastellPrev.TButton", background="#B39DDB", foreground="black")
@@ -255,7 +270,11 @@ def build_layout(self):
 	self.maxframes_spin = ttk.Spinbox(maxframes_row, from_=1, to=1024, increment=1, textvariable=self.maxframes_var, width=5, state="readonly")
 	self.maxframes_spin.pack(side=tk.LEFT)
 	self.tooltips['maxframes_spin'] = ToolTip(self.maxframes_spin, tr('tt_maxframes_spin', self.lang))
-	# Bindings werden in main.py gesetzt
+	# Neues Binding: Wertänderung ruft set_max_images auf
+	def on_maxframes_change(*args):
+		from image_processing import set_max_images
+		set_max_images(self, self.maxframes_var.get())
+	self.maxframes_var.trace_add('write', on_maxframes_change)
 	# Mittlerer Rahmen: Hintergrundfarbe, Randlos, Bild hinzufügen (jeweils Label/Checkbutton links, Wert/Button rechts)
 	middle_frame = ttk.LabelFrame(master_row)
 	middle_frame.pack(side=tk.LEFT, padx=5, fill=tk.Y)
@@ -307,6 +326,14 @@ def build_layout(self):
 	self.add_frame_btn = ttk.Button(add_row, text=tr('add_frame', self.lang) or "")
 	self.add_frame_btn.pack(side=tk.RIGHT, padx=(0,4))
 	self.tooltips['add_frame_btn'] = ToolTip(self.add_frame_btn, tr('tt_add_frame_btn', self.lang))
+	# Entfernen-Button für Frames
+	# Korrektur: style-Parameter nur setzen, wenn Stilname existiert
+	if 'RedClear.TButton' in ttk.Style().theme_names():
+		self.remove_frame_btn = ttk.Button(add_row, text="Entfernen", style="RedClear.TButton")
+	else:
+		self.remove_frame_btn = ttk.Button(add_row, text="Entfernen")
+	self.remove_frame_btn.pack(side=tk.RIGHT, padx=(0,4))
+	self.tooltips['remove_frame_btn'] = ToolTip(self.remove_frame_btn, "Bild entfernen")
 	# Rechter Rahmen: Sprache, Reset (jeweils Label links, Wert/Button rechts)
 	right_frame = ttk.LabelFrame(master_row)
 	right_frame.pack(side=tk.LEFT, padx=5, fill=tk.Y)

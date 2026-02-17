@@ -1,4 +1,8 @@
-
+###
+# file_ops.py
+# This file contains file operations for the OSSL2Gif application.
+# Version 2.0.0 © 2026 by Manfred Zainhofer
+###
 import math
 import os
 from tkinter import filedialog, messagebox, ttk
@@ -15,6 +19,7 @@ def load_gif_compat(self):
 		return
 	self._load_gif_frames(file)
 	self._setup_frame_select()
+	# Reihenfolge wird nur in _setup_frame_select gesetzt
 	self._reset_play_button()
 	self._update_status()
 	self._update_preview()
@@ -31,6 +36,7 @@ def load_gif(self):
 		return
 	self._load_gif_frames(file)
 	self._setup_frame_select()
+	# Reihenfolge wird nur in _setup_frame_select gesetzt
 	self._reset_play_button()
 	self._update_status()
 	self._update_preview()
@@ -59,10 +65,9 @@ def _load_gif_frames(self, file):
 def _setup_frame_select(self):
 	"""Initialisiert die Spinbox für die Frame-Auswahl."""
 	value = 0
+	# Nur Werte und Limits anpassen, keine Widget-Erstellung/Packing mehr
 	if hasattr(self, 'frame_select_spin') and self.frame_select_spin is not None:
-		self.frame_select_spin.destroy()
-	self.frame_select_spin = ttk.Spinbox(self.add_frame_btn.master, from_=0, to=max(0, self.frame_count-1), textvariable=self.frame_select_var, width=5, state="readonly")
-	self.frame_select_spin.pack(side="right")
+		self.frame_select_spin.config(from_=0, to=max(0, self.frame_count-1))
 	self.frame_select_var.set(value)
 	self.current_frame = 0
 
@@ -96,9 +101,7 @@ def delete_gif(self):
 	self.gif_canvas.config(image="")
 	self.status.config(text="")
 	self.maxframes_var.set(0)
-	if hasattr(self, 'frame_select_spin') and self.frame_select_spin is not None:
-		self.frame_select_spin.destroy()
-		self.frame_select_spin = None
+	# Keine Widget-Zerstörung mehr, nur Wert-Updates
 	if hasattr(self, 'add_frame_btn') and self.add_frame_btn is not None:
 		self.add_frame_btn.config(state="disabled")
 	if hasattr(self, 'play_btn') and self.play_btn is not None:

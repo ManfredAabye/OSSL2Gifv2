@@ -1,3 +1,8 @@
+###
+# start.py
+# This file serves as the entry point for the application. It initializes the main window and starts the application.
+# Version 2.0.0 © 2026 by Manfred Zainhofer
+###
 import tkinter as tk
 try:
 	import ttkbootstrap as tb

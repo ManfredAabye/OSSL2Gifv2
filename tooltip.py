@@ -1,4 +1,8 @@
-# Tooltip-Klasse ausgelagert
+###
+# tooltip.py
+# This file contains the Tooltip class for the OSSL2Gif application.
+# Version 2.0.0 © 2026 by Manfred Zainhofer
+###
 
 import tkinter as tk
 

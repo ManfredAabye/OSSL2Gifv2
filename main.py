@@ -1,5 +1,8 @@
-# OSSL2Gif - Ein Tool zum Konvertieren von GIF-Animationen in Texturen für OpenSimulator, Second Life und andere.
-# Version 1.0.6 © 2025 by Manfred Zainhofer
+###
+# main.py
+# This file contains the main application class ModernApp, which defines the GUI and core functionality of the OSSL2Gif application.
+# Version 2.0.0 © 2026 by Manfred Zainhofer
+###
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
@@ -67,6 +70,12 @@ class ModernApp:
         if hasattr(self, '_update_texture'):
             self._update_texture()
 
+    # Borderless-Methoden an die Instanz binden
+    def _ensure_borderless_methods(self):
+        from image_processing import apply_borderless, remove_borderless
+        self.apply_borderless = apply_borderless.__get__(self)
+        self.remove_borderless = remove_borderless.__get__(self)
+
     # Methoden aus file_ops an die Instanz binden, falls nicht schon vorhanden
     def _ensure_file_ops_methods(self):
         from file_ops import _load_gif_frames, _setup_frame_select, _reset_play_button, _update_status, _update_preview
@@ -112,6 +121,7 @@ class ModernApp:
         self.height_entry = None
         self.height_var = tk.IntVar(value=2048)
         self.load_btn = None
+        self.remove_frame_btn = None  # Für Entfernen-Button (Frames)
         self.save_gif_btn = None
         self.save_texture_btn = None
         self.export_lsl_btn = None
@@ -143,6 +153,7 @@ class ModernApp:
         self.borderless_chk = None
         self.export_format_label = None
         self.export_format_var = tk.StringVar(value='PNG')
+        self.media_framerate_var = None  # Wird in gui_layout.py gesetzt
         self.playing = False
         try:
             self.root.iconbitmap("icon.ico")
@@ -154,6 +165,7 @@ class ModernApp:
         # Konfiguration laden (vor build_layout, damit Werte übernommen werden)
         self._config_loaded = False
         config = load_config()
+        self._ensure_borderless_methods()
         self.build_layout()
         if config:
             self.apply_config(config)
@@ -166,6 +178,10 @@ class ModernApp:
         atexit.register(self.save_config)
         
         # --- Event-Bindings zentral setzen ---
+        # Entfernen-Button für Frames verbinden
+        if hasattr(self, 'remove_frame_btn') and self.remove_frame_btn is not None:
+            from events import remove_selected_frame_from_texture
+            self.remove_frame_btn.config(command=lambda: remove_selected_frame_from_texture(self))
         # Effekte-Panel (GIF)
         if self.gif_settings is not None and hasattr(self.gif_settings, 'grayscale_check'):
             self.gif_settings.grayscale_check.config(command=lambda: update_previews(self))
@@ -324,7 +340,12 @@ class ModernApp:
             return
         self.current_frame = (self.current_frame + 1) % self.frame_count
         show_gif_frame(self)
-        delay = self.framerate_var.get() if self.framerate_var is not None else 100
+        # Media-Play-Geschwindigkeit: Slider aus Media-Bereich bevorzugen
+        delay = 100
+        if hasattr(self, 'media_framerate_var') and self.media_framerate_var is not None:
+            delay = self.media_framerate_var.get()
+        elif self.framerate_var is not None:
+            delay = self.framerate_var.get()
         self.root.after(delay, self._run_animation)
 
     def pause_animation(self):

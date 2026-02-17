@@ -1,3 +1,9 @@
+###
+# translations.py
+# This file contains translations for the OSSL2Gif Python GUI.
+# Version 2.0.0 © 2026 by Manfred Zainhofer
+###
+
 # Übersetzungen für OSSL2Gif Python GUI
 translations = {
     'de': {
@@ -35,7 +41,7 @@ translations = {
         'status': 'Status',
         'file': 'Datei',
         'master_settings': 'Master Einstellungen',
-        'media': 'Media Gruppe',
+        'media': 'Media',
         # Tooltips
         'tt_media_group': 'Steuerung der GIF-Wiedergabe',
         'tt_prev_btn': 'Ein Bild zurück',

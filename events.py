@@ -1,4 +1,8 @@
-
+###
+# events.py
+# This file contains event handlers for the OSSL2Gif application.
+# Version 2.0.0 © 2026 by Manfred Zainhofer
+###
 from tkinter import messagebox, colorchooser, ttk
 from PIL import Image
 from translations import tr
@@ -82,28 +86,45 @@ def choose_bg_color(self, event=None):
 		update_previews(self)
 
 def add_selected_frame_to_texture(self):
-	idx = self.frame_select_var.get()
-	if not self.gif_frames or idx < 0 or idx >= len(self.gif_frames):
-		messagebox.showerror("Fehler", "Ungültige Bildnummer.")
-		return
-	max_frames = self.maxframes_var.get()
-	if len(self.gif_frames) >= max_frames:
-		messagebox.showerror("Fehler", f"Maximale Bildanzahl ({max_frames}) erreicht.")
-		return
-	frame = self.gif_frames[idx].copy()
-	self.gif_frames.append(frame)
-	self.frame_count = len(self.gif_frames)
-	value = self.frame_select_var.get()
-	self.frame_select_spin.destroy()
-	self.frame_select_spin = ttk.Spinbox(self.add_row, from_=0, to=max(0, self.frame_count-1), textvariable=self.frame_select_var, width=5, state="readonly")
-	# Beide Widgets neu packen, Reihenfolge: erst Spinbox, dann Button
-	self.add_frame_btn.pack_forget()
-	self.frame_select_spin.pack_forget()
-	self.frame_select_spin.pack(side="right")
-	self.add_frame_btn.pack(side="right", padx=(0,4))
-	self.frame_select_var.set(value)
-	self.status.config(text=f"Bild {idx} hinzugefügt. Gesamt: {self.frame_count}")
-	update_previews(self)
+	import threading
+	def do_add():
+		idx = self.frame_select_var.get()
+		if not self.gif_frames or idx < 0 or idx >= len(self.gif_frames):
+			messagebox.showerror("Fehler", "Ungültige Bildnummer.")
+			return
+		max_frames = self.maxframes_var.get()
+		if len(self.gif_frames) >= max_frames:
+			messagebox.showerror("Fehler", f"Maximale Bildanzahl ({max_frames}) erreicht.")
+			return
+		frame = self.gif_frames[idx].copy()
+		self.gif_frames.append(frame)
+		self.frame_count = len(self.gif_frames)
+		value = self.frame_select_var.get()
+		self.frame_select_spin.config(to=max(0, self.frame_count-1))
+		self.frame_select_var.set(value)
+		self.status.config(text=f"Bild {idx} hinzugefügt. Gesamt: {self.frame_count}")
+		update_previews(self)
+	threading.Thread(target=do_add).start()
+
+def remove_selected_frame_from_texture(self):
+	import threading
+	def do_remove():
+		idx = self.frame_select_var.get()
+		if not self.gif_frames or idx < 0 or idx >= len(self.gif_frames):
+			messagebox.showerror("Fehler", "Ungültige Bildnummer.")
+			return
+		if len(self.gif_frames) <= 1:
+			messagebox.showerror("Fehler", "Mindestens ein Bild muss erhalten bleiben.")
+			return
+		del self.gif_frames[idx]
+		self.frame_count = len(self.gif_frames)
+		# ACHTUNG: maxframes_var NICHT verändern, damit kein weiteres Bild entfernt wird!
+		value = min(self.frame_select_var.get(), self.frame_count-1)
+		self.frame_select_spin.config(to=max(0, self.frame_count-1))
+		self.frame_select_var.set(value)
+		self.status.config(text=f"Bild {idx} entfernt. Gesamt: {self.frame_count}")
+		update_previews(self)
+	threading.Thread(target=do_remove).start()
 
 def change_language(self, event=None):
 	self.lang = self.lang_var.get()

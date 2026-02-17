@@ -1,7 +1,30 @@
+###
+# image_processing.py
+# This file contains functions for processing images and GIFs within the OSSL2Gif application.
+# Version 2.0.0 © 2026 by Manfred Zainhofer
+###
+
 from PIL import Image, ImageTk
 from PIL import ImageColor, ImageEnhance, ImageFilter
 import math
 import os
+import threading
+from threading_utils import frame_queue
+
+# Für Borderless-Originalspeicherung
+borderless_original = {}
+
+def check_queue_for_frame(self):
+	try:
+		while True:
+			self_ref, processed_frame = frame_queue.get_nowait()
+			img = ImageTk.PhotoImage(processed_frame)
+			self_ref._gif_img_ref = img
+			self_ref.gif_canvas.config(image=img)
+	except Exception:
+		pass
+	# Wiederholen, falls noch nicht fertig
+	self.root.after(10, lambda: check_queue_for_frame(self))
 
 def show_gif_frame(self):
 	if not self.gif_frames:
@@ -25,78 +48,82 @@ def show_gif_frame(self):
 	self.show_texture()
 
 def show_texture(self):
-	if not self.gif_frames:
-		# Leere Textur erzeugen, damit self.texture_image nicht None ist
-		tex_w = self.width_var.get() if self.width_var.get() > 0 else 2048
-		tex_h = self.height_var.get() if self.height_var.get() > 0 else 2048
-		from PIL import ImageColor
-		try:
-			bg_rgba = ImageColor.getcolor(getattr(self, 'bg_color', '#00000000'), "RGBA")
-		except Exception:
-			bg_rgba = (0,0,0,0)
-		sheet = Image.new("RGBA", (tex_w, tex_h), bg_rgba)
-		self.texture_image = sheet
-		canvas_w = self.texture_canvas.winfo_width()
-		canvas_h = self.texture_canvas.winfo_height()
-		if canvas_w < 10 or canvas_h < 10:
-			canvas_w, canvas_h = 256, 256
-		preview = sheet.resize((canvas_w, canvas_h), Image.Resampling.LANCZOS)
-		# ImageTk wird am Dateianfang importiert
-		img = ImageTk.PhotoImage(preview)
-		self._texture_img_ref = img
-		self.texture_canvas.config(image=img)
-		return
-	import math, os
 	tex_w = self.width_var.get() if self.width_var.get() > 0 else 2048
 	tex_h = self.height_var.get() if self.height_var.get() > 0 else 2048
-	frame_count = self.frame_count
-	tiles_x = math.ceil(math.sqrt(frame_count))
-	tiles_y = math.ceil(frame_count / tiles_x)
-	tile_w = tex_w // tiles_x
-	tile_h = tex_h // tiles_y
 	from PIL import ImageColor
 	bg_rgba = (0,0,0,0)
 	try:
-		bg_rgba = ImageColor.getcolor(self.bg_color, "RGBA")
+		bg_rgba = ImageColor.getcolor(getattr(self, 'bg_color', '#00000000'), "RGBA")
 	except Exception:
-		pass
-	sheet = Image.new("RGBA", (tex_w, tex_h), bg_rgba)
-	try:
-		for idx, frame in enumerate(self.gif_frames):
-			tx = idx % tiles_x
-			ty = idx // tiles_x
-			f = frame.resize((tile_w, tile_h), Image.Resampling.LANCZOS)
-			f = apply_effects(self, f, prefix="texture")
-			x = tx * tile_w
-			y = ty * tile_h
-			sheet.paste(f, (x, y))
-	except Exception as e:
-		# Fehler beim Erstellen der Textur: Leere Textur erzeugen
+		bg_rgba = (0,0,0,0)
+
+	# Sheet erzeugen
+	tiles_x = 1
+	tiles_y = 1
+	if not self.gif_frames:
 		sheet = Image.new("RGBA", (tex_w, tex_h), bg_rgba)
-		self.texture_image = sheet
-		canvas_w = self.texture_canvas.winfo_width()
-		canvas_h = self.texture_canvas.winfo_height()
-		if canvas_w < 10 or canvas_h < 10:
-			canvas_w, canvas_h = 256, 256
-		preview = sheet.resize((canvas_w, canvas_h), Image.Resampling.LANCZOS)
-		# ImageTk wird am Dateianfang importiert
-		img = ImageTk.PhotoImage(preview)
-		self._texture_img_ref = img
-		self.texture_canvas.config(image=img)
-		return
+	else:
+		frame_count = self.frame_count
+		tiles_x = math.ceil(math.sqrt(frame_count))
+		tiles_y = math.ceil(frame_count / tiles_x)
+		tile_w = tex_w // tiles_x
+		tile_h = tex_h // tiles_y
+		sheet = Image.new("RGBA", (tex_w, tex_h), bg_rgba)
+		try:
+			for idx, frame in enumerate(self.gif_frames):
+				tx = idx % tiles_x
+				ty = idx // tiles_x
+				f = frame.resize((tile_w, tile_h), Image.Resampling.LANCZOS)
+				f = apply_effects(self, f, prefix="texture")
+				x = tx * tile_w
+				y = ty * tile_h
+				sheet.paste(f, (x, y))
+		except Exception as e:
+			sheet = Image.new("RGBA", (tex_w, tex_h), bg_rgba)
+
+	# Borderless-Logik
 	if hasattr(self, 'borderless_var') and self.borderless_var.get():
-		bbox = sheet.getbbox()
-		if bbox:
-			sheet = sheet.crop(bbox)
-	self.texture_image = sheet
+		self.apply_borderless(sheet, tex_w, tex_h, tiles_x, tiles_y)
+	else:
+		self.remove_borderless(sheet, tex_w, tex_h)
+
+	# Vorschau erzeugen
 	canvas_w = self.texture_canvas.winfo_width()
 	canvas_h = self.texture_canvas.winfo_height()
 	if canvas_w < 10 or canvas_h < 10:
 		canvas_w, canvas_h = 256, 256
-	preview = sheet.resize((canvas_w, canvas_h), Image.Resampling.LANCZOS)
+	preview = self.texture_image.resize((canvas_w, canvas_h), Image.Resampling.LANCZOS)
 	img = ImageTk.PhotoImage(preview)
 	self._texture_img_ref = img
 	self.texture_canvas.config(image=img)
+
+def toggle_borderless(self):
+	"""Schaltet den Borderless-Modus um"""
+	if hasattr(self, 'borderless_var'):
+		if self.borderless_var.get():
+			self.show_texture()
+		else:
+			self.show_texture()
+
+def apply_borderless(self, sheet, tex_w, tex_h, tiles_x, tiles_y):
+	"""Entfernt Ränder für nahtloses Tiling"""
+	# Original speichern
+	global borderless_original
+	borderless_original[self] = sheet.copy()
+	# Berechne die tatsächliche gefüllte Fläche (nur Tiles, keine Restpixel)
+	tile_w = tex_w // tiles_x
+	tile_h = tex_h // tiles_y
+	filled_w = tile_w * tiles_x
+	filled_h = tile_h * tiles_y
+	# Crop auf gefüllte Fläche
+	cropped = sheet.crop((0, 0, filled_w, filled_h))
+	self.texture_image = cropped
+
+def remove_borderless(self, sheet, tex_w, tex_h):
+	"""Stellt das Originalbild wieder her"""
+	global borderless_original
+	# Immer das Sheet als Original verwenden
+	self.texture_image = sheet
 
 def update_previews(self):
 	show_gif_frame(self)
@@ -136,3 +163,23 @@ def apply_effects(self, img, prefix):
 				factor = 1.0 + (colorint - 0.5) * 2
 				img = ImageEnhance.Color(img).enhance(factor)
 	return img
+
+def set_max_images(self, value):
+	"""Setzt die maximale Anzahl der Bilder und entfernt ggf. überschüssige Frames."""
+	try:
+		max_frames = int(value)
+	except Exception:
+		max_frames = self.maxframes_var.get() if hasattr(self, 'maxframes_var') else 64
+	if hasattr(self, 'gif_frames') and len(self.gif_frames) > max_frames:
+		self.gif_frames = self.gif_frames[:max_frames]
+		self.frame_count = len(self.gif_frames)
+		if hasattr(self, 'status'):
+			self.status.config(text=f"Max. Bilder: {self.frame_count}")
+		if hasattr(self, 'frame_select_var'):
+			self.frame_select_var.set(min(self.frame_select_var.get(), self.frame_count-1))
+		if hasattr(self, 'frame_select_spin'):
+			self.frame_select_spin.config(to=max(0, self.frame_count-1))
+		if hasattr(self, 'add_frame_btn'):
+			self.add_frame_btn.config(state="normal" if self.frame_count < max_frames else "disabled")
+		if hasattr(self, 'update_previews'):
+			self.update_previews()

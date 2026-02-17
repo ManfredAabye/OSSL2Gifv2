@@ -1,0 +1,10 @@
+{
+  "lang": "de",
+  "width": 2048,
+  "height": 2048,
+  "bg_color": "#80ff00",
+  "borderless": 1,
+  "framerate": 10,
+  "export_format": "JPG",
+  "maxframes": 50
+}
