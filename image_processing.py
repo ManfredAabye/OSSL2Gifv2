@@ -4,6 +4,8 @@
 # Version 2.0.0 © 2026 by Manfred Zainhofer
 ###
 
+
+from typing import Any
 from PIL import Image, ImageTk
 from PIL import ImageColor, ImageEnhance, ImageFilter
 import math
@@ -14,7 +16,7 @@ from threading_utils import frame_queue
 # Für Borderless-Originalspeicherung
 borderless_original = {}
 
-def check_queue_for_frame(self):
+def check_queue_for_frame(self: Any) -> None:
 	try:
 		while True:
 			self_ref, processed_frame = frame_queue.get_nowait()
@@ -26,28 +28,35 @@ def check_queue_for_frame(self):
 	# Wiederholen, falls noch nicht fertig
 	self.root.after(10, lambda: check_queue_for_frame(self))
 
-def show_gif_frame(self):
+def show_gif_frame(self: Any) -> None:
+	from tkinter import messagebox
 	if not self.gif_frames:
 		self.gif_canvas.config(image="")
 		self.show_texture()
 		return
-	frame = self.gif_frames[self.current_frame]
-	canvas_w = self.gif_canvas.winfo_width()
-	canvas_h = self.gif_canvas.winfo_height()
-	texture_w = self.texture_canvas.winfo_width()
-	texture_h = self.texture_canvas.winfo_height()
-	max_w = min(canvas_w, texture_w) if texture_w > 10 else canvas_w
-	max_h = min(canvas_h, texture_h) if texture_h > 10 else canvas_h
-	if max_w < 10 or max_h < 10:
-		max_w, max_h = 256, 256
-	frame = frame.resize((max_w, max_h), Image.Resampling.LANCZOS)
-	frame = apply_effects(self, frame, prefix="gif")
-	img = ImageTk.PhotoImage(frame)
-	self._gif_img_ref = img
-	self.gif_canvas.config(image=img)
-	self.show_texture()
+	try:
+		frame = self.gif_frames[self.current_frame]
+		canvas_w = self.gif_canvas.winfo_width()
+		canvas_h = self.gif_canvas.winfo_height()
+		texture_w = self.texture_canvas.winfo_width()
+		texture_h = self.texture_canvas.winfo_height()
+		max_w = min(canvas_w, texture_w) if texture_w > 10 else canvas_w
+		max_h = min(canvas_h, texture_h) if texture_h > 10 else canvas_h
+		if max_w < 10 or max_h < 10:
+			max_w, max_h = 256, 256
+		frame = frame.resize((max_w, max_h), Image.Resampling.LANCZOS)
+		frame = apply_effects(self, frame, prefix="gif")
+		img = ImageTk.PhotoImage(frame)
+		self._gif_img_ref = img
+		self.gif_canvas.config(image=img)
+		self.show_texture()
+	except MemoryError:
+		messagebox.showerror("Fehler", "Nicht genügend Speicher für GIF-Vorschau.")
+	except Exception as e:
+		messagebox.showerror("Fehler", f"Fehler bei GIF-Vorschau: {e}")
 
-def show_texture(self):
+def show_texture(self: Any) -> None:
+	from tkinter import messagebox
 	tex_w = self.width_var.get() if self.width_var.get() > 0 else 2048
 	tex_h = self.height_var.get() if self.height_var.get() > 0 else 2048
 	from PIL import ImageColor
@@ -60,16 +69,16 @@ def show_texture(self):
 	# Sheet erzeugen
 	tiles_x = 1
 	tiles_y = 1
-	if not self.gif_frames:
-		sheet = Image.new("RGBA", (tex_w, tex_h), bg_rgba)
-	else:
-		frame_count = self.frame_count
-		tiles_x = math.ceil(math.sqrt(frame_count))
-		tiles_y = math.ceil(frame_count / tiles_x)
-		tile_w = tex_w // tiles_x
-		tile_h = tex_h // tiles_y
-		sheet = Image.new("RGBA", (tex_w, tex_h), bg_rgba)
-		try:
+	try:
+		if not self.gif_frames:
+			sheet = Image.new("RGBA", (tex_w, tex_h), bg_rgba)
+		else:
+			frame_count = self.frame_count
+			tiles_x = math.ceil(math.sqrt(frame_count))
+			tiles_y = math.ceil(frame_count / tiles_x)
+			tile_w = tex_w // tiles_x
+			tile_h = tex_h // tiles_y
+			sheet = Image.new("RGBA", (tex_w, tex_h), bg_rgba)
 			for idx, frame in enumerate(self.gif_frames):
 				tx = idx % tiles_x
 				ty = idx // tiles_x
@@ -78,8 +87,12 @@ def show_texture(self):
 				x = tx * tile_w
 				y = ty * tile_h
 				sheet.paste(f, (x, y))
-		except Exception as e:
-			sheet = Image.new("RGBA", (tex_w, tex_h), bg_rgba)
+	except MemoryError:
+		messagebox.showerror("Fehler", "Nicht genügend Speicher für Textur-Erstellung.")
+		sheet = Image.new("RGBA", (tex_w, tex_h), bg_rgba)
+	except Exception as e:
+		messagebox.showerror("Fehler", f"Fehler bei der Textur-Erstellung: {e}")
+		sheet = Image.new("RGBA", (tex_w, tex_h), bg_rgba)
 
 	# Borderless-Logik
 	if hasattr(self, 'borderless_var') and self.borderless_var.get():
@@ -88,16 +101,21 @@ def show_texture(self):
 		self.remove_borderless(sheet, tex_w, tex_h)
 
 	# Vorschau erzeugen
-	canvas_w = self.texture_canvas.winfo_width()
-	canvas_h = self.texture_canvas.winfo_height()
-	if canvas_w < 10 or canvas_h < 10:
-		canvas_w, canvas_h = 256, 256
-	preview = self.texture_image.resize((canvas_w, canvas_h), Image.Resampling.LANCZOS)
-	img = ImageTk.PhotoImage(preview)
-	self._texture_img_ref = img
-	self.texture_canvas.config(image=img)
+	try:
+		canvas_w = self.texture_canvas.winfo_width()
+		canvas_h = self.texture_canvas.winfo_height()
+		if canvas_w < 10 or canvas_h < 10:
+			canvas_w, canvas_h = 256, 256
+		preview = self.texture_image.resize((canvas_w, canvas_h), Image.Resampling.LANCZOS)
+		img = ImageTk.PhotoImage(preview)
+		self._texture_img_ref = img
+		self.texture_canvas.config(image=img)
+	except MemoryError:
+		messagebox.showerror("Fehler", "Nicht genügend Speicher für Textur-Vorschau.")
+	except Exception as e:
+		messagebox.showerror("Fehler", f"Fehler bei der Textur-Vorschau: {e}")
 
-def toggle_borderless(self):
+def toggle_borderless(self: Any) -> None:
 	"""Schaltet den Borderless-Modus um"""
 	if hasattr(self, 'borderless_var'):
 		if self.borderless_var.get():
@@ -105,7 +123,7 @@ def toggle_borderless(self):
 		else:
 			self.show_texture()
 
-def apply_borderless(self, sheet, tex_w, tex_h, tiles_x, tiles_y):
+def apply_borderless(self: Any, sheet: Image.Image, tex_w: int, tex_h: int, tiles_x: int, tiles_y: int) -> None:
 	"""Entfernt Ränder für nahtloses Tiling"""
 	# Original speichern
 	global borderless_original
@@ -119,16 +137,38 @@ def apply_borderless(self, sheet, tex_w, tex_h, tiles_x, tiles_y):
 	cropped = sheet.crop((0, 0, filled_w, filled_h))
 	self.texture_image = cropped
 
-def remove_borderless(self, sheet, tex_w, tex_h):
+def remove_borderless(self: Any, sheet: Image.Image, tex_w: int, tex_h: int) -> None:
 	"""Stellt das Originalbild wieder her"""
 	global borderless_original
 	# Immer das Sheet als Original verwenden
 	self.texture_image = sheet
 
-def update_previews(self):
+def remove_borderless_transparency(img: Image.Image, alpha_threshold: int = 8, softness: int = 8) -> Image.Image:
+	"""
+	Schneidet das Bild so zu, dass auch weiche Schatten/Anti-Aliasing-Ränder (Transparenz) erhalten bleiben.
+	alpha_threshold: Minimaler Alphawert (0-255), der als "sichtbar" gilt.
+	softness: Wie viele Pixel mit weichem Übergang (Schatten) zusätzlich erhalten bleiben (Padding).
+	"""
+	if img.mode != "RGBA":
+		img = img.convert("RGBA")
+	arr = img.getchannel("A")
+	# Suche sichtbare Pixel (Alpha > threshold)
+	bbox = arr.point(lambda a: 255 if isinstance(a, (int, float)) and int(a) > alpha_threshold else 0).getbbox()
+	if not bbox:
+		return img  # Nur transparent
+	# Padding für weiche Schatten
+	left, upper, right, lower = bbox
+	left = max(0, left - softness)
+	upper = max(0, upper - softness)
+	right = min(img.width, right + softness)
+	lower = min(img.height, lower + softness)
+	cropped = img.crop((left, upper, right, lower))
+	return cropped
+
+def update_previews(self: Any) -> None:
 	show_gif_frame(self)
 
-def apply_effects(self, img, prefix):
+def apply_effects(self: Any, img: Image.Image, prefix: str) -> Image.Image:
 	from PIL import ImageEnhance, ImageFilter
 	if self.__dict__[f'{prefix}_grayscale'].get():
 		img = img.convert("L").convert("RGBA")
@@ -164,7 +204,7 @@ def apply_effects(self, img, prefix):
 				img = ImageEnhance.Color(img).enhance(factor)
 	return img
 
-def set_max_images(self, value):
+def set_max_images(self: Any, value: int) -> None:
 	"""Setzt die maximale Anzahl der Bilder und entfernt ggf. überschüssige Frames."""
 	try:
 		max_frames = int(value)

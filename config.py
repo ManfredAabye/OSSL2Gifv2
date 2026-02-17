@@ -14,9 +14,13 @@ else:
     # Im normalen Python: Schreibe ins Quellverzeichnis
     CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'config.json')
 
-def save_config(data):
-    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+def save_config(self):
+    """Speichert die Konfiguration der App-Instanz (self) in die config.json."""
+    # self.get_config() muss ein dict liefern
+    data = self.get_config() if hasattr(self, 'get_config') else None
+    if data is not None:
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
 
 def load_config():
     if not os.path.exists(CONFIG_FILE):

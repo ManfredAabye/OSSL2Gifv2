@@ -3,14 +3,17 @@
 # This file contains file operations for the OSSL2Gif application.
 # Version 2.0.0 © 2026 by Manfred Zainhofer
 ###
+
 import math
 import os
+import logging
+from typing import Any
 from tkinter import filedialog, messagebox, ttk
 from PIL import Image
 from translations import tr
 from image_processing import update_previews, apply_effects
 
-def load_gif_compat(self):
+def load_gif_compat(self: Any) -> None:
 	"""
 	Kompatibilitäts-Wrapper für alte Aufrufe: Lädt ein GIF und aktualisiert alle GUI-Elemente wie früher in einer Methode.
 	"""
@@ -27,7 +30,7 @@ def load_gif_compat(self):
 	if hasattr(self, '_update_texture'):
 		self._update_texture()
 
-def load_gif(self):
+def load_gif(self: Any) -> None:
 	"""
 	Öffnet einen Dialog, lädt ein GIF und initialisiert die GUI über Hilfsmethoden.
 	"""
@@ -44,25 +47,42 @@ def load_gif(self):
 	if hasattr(self, '_update_texture'):
 		self._update_texture()
 
-def _load_gif_frames(self, file):
+def _load_gif_frames(self: Any, file: str) -> None:
 	"""Lädt die Frames aus einer GIF-Datei und setzt gif_image, gif_frames, frame_count, current_frame."""
-	self.gif_image = Image.open(file)
+	from PIL import UnidentifiedImageError
 	frames = []
 	try:
+		self.gif_image = Image.open(file)
 		while True:
 			frames.append(self.gif_image.copy())
 			self.gif_image.seek(len(frames))
+	except FileNotFoundError:
+		messagebox.showerror("Fehler", f"Datei nicht gefunden: {file}")
+		return
+	except UnidentifiedImageError:
+		messagebox.showerror("Fehler", f"Die Datei ist kein gültiges GIF oder beschädigt: {file}")
+		return
 	except EOFError:
 		pass
-	if not frames:
-		frames.append(self.gif_image.copy())
-	print(f"[DEBUG] Frames geladen: {len(frames)}")
+	except MemoryError:
+		messagebox.showerror("Fehler", "Nicht genügend Speicher zum Laden des GIFs.")
+		return
+	except Exception as e:
+		messagebox.showerror("Fehler", f"Unbekannter Fehler beim Laden des GIFs: {e}")
+		return
+	if not frames and hasattr(self, 'gif_image'):
+		try:
+			frames.append(self.gif_image.copy())
+		except Exception:
+			messagebox.showerror("Fehler", "GIF konnte nicht geladen werden.")
+			return
+	logging.debug(f"Frames geladen: {len(frames)}")
 	self.gif_frames = frames
 	self.frame_count = len(frames)
 	self.current_frame = 0
 	self.playing = False
 
-def _setup_frame_select(self):
+def _setup_frame_select(self: Any) -> None:
 	"""Initialisiert die Spinbox für die Frame-Auswahl."""
 	value = 0
 	# Nur Werte und Limits anpassen, keine Widget-Erstellung/Packing mehr
@@ -71,22 +91,22 @@ def _setup_frame_select(self):
 	self.frame_select_var.set(value)
 	self.current_frame = 0
 
-def _reset_play_button(self):
+def _reset_play_button(self: Any) -> None:
 	"""Setzt den Play-Button auf den Startwert zurück."""
 	self.play_btn.config(text=tr('play', self.lang) or "Play ▶")
 
-def _update_status(self):
+def _update_status(self: Any) -> None:
 	"""Aktualisiert die Statusleiste mit der Frame-Anzahl."""
 	self.maxframes_var.set(self.frame_count)
 	self.status.config(text=f"{tr('frame_count', self.lang)}: {self.frame_count}")
 
-def _update_preview(self):
+def _update_preview(self: Any) -> None:
 	"""Aktualisiert die GIF-Vorschau in der GUI."""
 	if hasattr(self, 'root') and self.root is not None:
 		self.root.update_idletasks()
 		update_previews(self)
 
-def delete_gif(self):
+def delete_gif(self: Any) -> None:
 	"""
 	Setzt alle GIF- und Textur-bezogenen Attribute und GUI-Elemente zurück.
 	Wird z.B. aufgerufen, wenn ein GIF entladen oder ein neues geladen werden soll.
@@ -107,7 +127,7 @@ def delete_gif(self):
 	if hasattr(self, 'play_btn') and self.play_btn is not None:
 		self.play_btn.config(text=tr('play', self.lang) or "Play ▶", state="disabled")
 
-def save_gif(self):
+def save_gif(self: Any) -> None:
 	if not self.gif_frames:
 		messagebox.showerror("Fehler", "Kein GIF geladen.")
 		return
@@ -119,10 +139,14 @@ def save_gif(self):
 		duration = self.framerate_var.get()
 		frames[0].save(file, save_all=True, append_images=frames[1:], loop=0, duration=duration)
 		messagebox.showinfo("Info", "GIF gespeichert.")
+	except FileNotFoundError:
+		messagebox.showerror("Fehler", f"Datei konnte nicht gespeichert werden: {file}")
+	except MemoryError:
+		messagebox.showerror("Fehler", "Nicht genügend Speicher zum Speichern des GIFs.")
 	except Exception as e:
-		messagebox.showerror("Fehler", str(e))
+		messagebox.showerror("Fehler", f"Fehler beim Speichern des GIFs: {e}")
 
-def save_texture(self):
+def save_texture(self: Any) -> None:
 	if self.texture_image is None:
 		messagebox.showerror("Fehler", "Keine Textur vorhanden.")
 		return
@@ -149,10 +173,14 @@ def save_texture(self):
 			img = img.convert("RGB")
 		img.save(file, format=fmt)
 		messagebox.showinfo("Info", "Textur gespeichert.")
+	except FileNotFoundError:
+		messagebox.showerror("Fehler", f"Datei konnte nicht gespeichert werden: {file}")
+	except MemoryError:
+		messagebox.showerror("Fehler", "Nicht genügend Speicher zum Speichern der Textur.")
 	except Exception as e:
-		messagebox.showerror("Fehler", str(e))
+		messagebox.showerror("Fehler", f"Fehler beim Speichern der Textur: {e}")
 
-def export_lsl(self):
+def export_lsl(self: Any) -> None:
 	if not self.gif_frames:
 		messagebox.showerror("Fehler", "Kein GIF geladen.")
 		return
@@ -174,6 +202,6 @@ def export_lsl(self):
 	except Exception as e:
 		messagebox.showerror("Fehler", str(e))
 
-def generate_lsl_script(self, name, tiles_x, tiles_y, speed):
+def generate_lsl_script(self: Any, name: str, tiles_x: int, tiles_y: int, speed: float) -> str:
 		length = tiles_x * tiles_y
 		return f'''// LSL Texture Animation Script\n// Generated by OSSL2Gif\n// Texture: {name};{tiles_x};{tiles_y};{speed}\n\ninteger animOn = TRUE;\nlist effects = [LOOP];\ninteger movement = 0;\ninteger face = ALL_SIDES;\ninteger sideX = {tiles_x};\ninteger sideY = {tiles_y};\nfloat start = 0.0;\nfloat length = {length};\nfloat speed = {speed};\n\ninitAnim() {{\n    if(animOn) {{\n        integer effectBits;\n        integer i;\n        for(i = 0; i < llGetListLength(effects); i++) {{\n            effectBits = (effectBits | llList2Integer(effects,i));\n        }}\n        integer params = (effectBits|movement);\n        llSetTextureAnim(ANIM_ON|params,face,sideX,sideY,start,length,speed);\n    }}\n    else {{\n        llSetTextureAnim(0,face,sideX,sideY,start,length,speed);\n    }}\n}}\n\nfetch() {{\n     string texture = llGetInventoryName(INVENTORY_TEXTURE,0);\n            llSetTexture(texture,face);\n            // llParseString2List braucht als Trennzeichen eine Liste!\n            list data  = llParseString2List(texture,[";"],[]);\n            string X = llList2String(data,1);\n            string Y = llList2String(data,2);\n            string Z = llList2String(data,3);\n            sideX = (integer) X;\n            sideY = (integer) Y;\n            speed = (float) Z;\n            length = (float)(sideX * sideY);\n            if (speed) \n                initAnim();\n}}\n\ndefault\n{{\n    state_entry()\n    {{\n        llSetTextureAnim(FALSE, face, 0, 0, 0.0, 0.0, 1.0);\n        fetch();\n    }}\n    changed(integer what)\n    {{\n        if (what & CHANGED_INVENTORY)\n        {{\n            fetch();\n        }}\n    }}\n}}\n'''

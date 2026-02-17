@@ -8,7 +8,8 @@
 translations = {
     'de': {
         'bg_color': 'Hintergrundfarbe',
-        'framerate': 'Bildrate ',
+        'remove_frame': 'Entfernen',
+        'framerate': 'Bildrate',
         'export_format': 'Exportformat',
         'max_images': 'Max. Bilder',
         'gif_preview': 'GIF-Vorschau',
@@ -42,7 +43,10 @@ translations = {
         'file': 'Datei',
         'master_settings': 'Master Einstellungen',
         'media': 'Media',
+        'tt_media_framerate_label': 'Bildrate für die Animation in Millisekunden pro Bild (Media-Gruppe)',
         # Tooltips
+        'tt_export_format_label': 'Exportformat für die Textur wählen',
+        'tt_remove_frame_btn': 'Ausgewähltes Bild entfernen',
         'tt_media_group': 'Steuerung der GIF-Wiedergabe',
         'tt_prev_btn': 'Ein Bild zurück',
         'tt_pause_btn': 'Animation pausieren',
@@ -78,6 +82,9 @@ translations = {
     },
     'en': {
         'media': 'Media',
+        'remove_frame': 'Remove',
+        'framerate': 'Frame rate',
+        'tt_media_framerate_label': 'Frame rate for the animation in milliseconds per frame (Media group)',
         'tt_media_group': 'Media controls',
         'tt_prev_btn': 'Step one frame back',
         'tt_pause_btn': 'Pause animation',
@@ -119,6 +126,8 @@ translations = {
         'file': 'File',
         'master_settings': 'Master Settings',
         # Tooltips
+        'tt_export_format_label': 'Select export format for the texture',
+        'tt_remove_frame_btn': 'Remove selected frame',
         'tt_gif_label': 'Preview of the loaded GIF',
         'tt_gif_canvas': 'The loaded GIF is displayed here. Click to load a GIF.',
         'tt_gif_settings': 'Adjust effects for the GIF',
@@ -148,6 +157,9 @@ translations = {
     },
     'fr': {
         'media': 'Média',
+        'remove_frame': 'Supprimer',
+        'framerate': 'Fréquence',
+        'tt_media_framerate_label': 'Fréquence pour l’animation en millisecondes par image (groupe Média)',
         'tt_media_group': 'Contrôles de lecture GIF',
         'tt_prev_btn': 'Image précédente',
         'tt_pause_btn': 'Mettre l’animation en pause',
@@ -189,6 +201,8 @@ translations = {
         'file': 'Fichier',
         'master_settings': 'Paramètres principaux',
         # Tooltips
+        'tt_export_format_label': 'Choisir le format d’exportation pour la texture',
+        'tt_remove_frame_btn': 'Supprimer l’image sélectionnée',
         'tt_gif_label': 'Aperçu du GIF chargé',
         'tt_gif_canvas': 'Le GIF chargé est affiché ici. Cliquez pour charger un GIF.',
         'tt_gif_settings': 'Ajuster les effets pour le GIF',
@@ -218,6 +232,9 @@ translations = {
     },
     'es': {
         'media': 'Media',
+        'remove_frame': 'Eliminar',
+        'framerate': 'Frecuencia',
+        'tt_media_framerate_label': 'Frecuencia para la animación en milisegundos por cuadro (grupo Media)',
         'tt_media_group': 'Controles de reproducción GIF',
         'tt_prev_btn': 'Un cuadro atrás',
         'tt_pause_btn': 'Pausar animación',
@@ -259,6 +276,8 @@ translations = {
         'file': 'Archivo',
         'master_settings': 'Ajustes principales',
         # Tooltips
+        'tt_export_format_label': 'Seleccionar formato de exportación para la textura',
+        'tt_remove_frame_btn': 'Eliminar la imagen seleccionada',
         'tt_gif_label': 'Vista previa del GIF cargado',
         'tt_gif_canvas': 'El GIF cargado se muestra aquí. Haga clic para cargar un GIF.',
         'tt_gif_settings': 'Ajustar efectos para el GIF',
@@ -288,6 +307,9 @@ translations = {
     },
     'nl': {
         'media': 'Media',
+        'remove_frame': 'Verwijderen',
+        'framerate': 'Framerate',
+        'tt_media_framerate_label': 'Framerate voor de animatie in milliseconden per beeld (Media-groep)',
         'tt_media_group': 'GIF-afspeelbediening',
         'tt_prev_btn': 'Eén frame terug',
         'tt_pause_btn': 'Animatie pauzeren',
@@ -329,6 +351,8 @@ translations = {
         'file': 'Bestand',
         'master_settings': 'Hoofdinstellingen',
         # Tooltips
+        'tt_export_format_label': 'Exporteerformaat voor de textuur kiezen',
+        'tt_remove_frame_btn': 'Verwijder geselecteerde afbeelding',
         'tt_gif_label': 'Voorbeeld van het geladen GIF',
         'tt_gif_canvas': 'Het geladen GIF wordt hier weergegeven. Klik om een GIF te laden.',
         'tt_gif_settings': 'Effecten voor het GIF instellen',
@@ -358,6 +382,9 @@ translations = {
     },
     'se': {
         'media': 'Media',
+        'remove_frame': 'Ta bort',
+        'framerate': 'Bildfrekvens',
+        'tt_media_framerate_label': 'Bildfrekvens för animeringen i millisekunder per bild (Media-grupp)',
         'tt_media_group': 'GIF-uppspelningskontroller',
         'tt_prev_btn': 'Ett steg bakåt',
         'tt_pause_btn': 'Pausa animering',
@@ -399,6 +426,8 @@ translations = {
         'file': 'Fil',
         'master_settings': 'Huvudinställningar',
         # Tooltips
+        'tt_export_format_label': 'Välj exportformat för texturen',
+        'tt_remove_frame_btn': 'Ta bort vald bild',
         'tt_gif_label': 'Förhandsvisning av inläst GIF',
         'tt_gif_canvas': 'Den inlästa GIF:en visas här. Klicka för att ladda en GIF.',
         'tt_gif_settings': 'Justera effekter för GIF:en',
@@ -428,6 +457,9 @@ translations = {
     },
     'pl': {
         'media': 'Media',
+        'remove_frame': 'Usuń',
+        'framerate': 'Klatka na sekundę',
+        'tt_media_framerate_label': 'Klatkaż animacji w milisekundach na klatkę (grupa Media)',
         'tt_media_group': 'Sterowanie odtwarzaniem GIF',
         'tt_prev_btn': 'Jedna klatka wstecz',
         'tt_pause_btn': 'Wstrzymaj animację',
@@ -469,6 +501,8 @@ translations = {
         'file': 'Plik',
         'master_settings': 'Ustawienia główne',
         # Tooltips
+        'tt_export_format_label': 'Wybierz format eksportu dla tekstury',
+        'tt_remove_frame_btn': 'Usuń wybrany obraz',
         'tt_gif_label': 'Podgląd wczytanego GIF-a',
         'tt_gif_canvas': 'Wczytany GIF jest wyświetlany tutaj. Kliknij, aby wczytać GIF.',
         'tt_gif_settings': 'Ustaw efekty dla GIF-a',
@@ -498,6 +532,9 @@ translations = {
     },
     'pt': {
         'media': 'Mídia',
+        'remove_frame': 'Remover',
+        'framerate': 'Taxa de quadros',
+        'tt_media_framerate_label': 'Taxa de quadros para a animação em milissegundos por quadro (grupo Mídia)',
         'tt_media_group': 'Controles de reprodução de GIF',
         'tt_prev_btn': 'Um quadro para trás',
         'tt_pause_btn': 'Pausar animação',
@@ -539,6 +576,8 @@ translations = {
         'file': 'Arquivo',
         'master_settings': 'Configurações principais',
         # Tooltips
+        'tt_export_format_label': 'Selecionar formato de exportação para a textura',
+        'tt_remove_frame_btn': 'Remover a imagem selecionada',
         'tt_gif_label': 'Pré-visualização do GIF carregado',
         'tt_gif_canvas': 'O GIF carregado é exibido aqui. Clique para carregar um GIF.',
         'tt_gif_settings': 'Ajustar efeitos para o GIF',
@@ -568,6 +607,9 @@ translations = {
     },
     'it': {
         'media': 'Media',
+        'remove_frame': 'Rimuovi',
+        'framerate': 'Frequenza fotogrammi',
+        'tt_media_framerate_label': 'Frequenza per l’animazione in millisecondi per fotogramma (gruppo Media)',
         'tt_media_group': 'Controlli di riproduzione GIF',
         'tt_prev_btn': 'Un fotogramma indietro',
         'tt_pause_btn': 'Metti in pausa l’animazione',
@@ -609,6 +651,8 @@ translations = {
         'file': 'File',
         'master_settings': 'Impostazioni principali',
         # Tooltips
+        'tt_export_format_label': 'Seleziona il formato di esportazione per la texture',
+        'tt_remove_frame_btn': 'Rimuovi l’immagine selezionata',
         'tt_gif_label': 'Anteprima della GIF caricata',
         'tt_gif_canvas': 'La GIF caricata viene visualizzata qui. Clicca per caricare una GIF.',
         'tt_gif_settings': 'Regola gli effetti per la GIF',
@@ -638,6 +682,9 @@ translations = {
     },
     'ru': {
         'media': 'Медиа',
+        'remove_frame': 'Удалить',
+        'framerate': 'Частота кадров',
+        'tt_media_framerate_label': 'Частота кадров для анимации в миллисекундах за кадр (группа Медиа)',
         'tt_media_group': 'Управление воспроизведением GIF',
         'tt_prev_btn': 'На один кадр назад',
         'tt_pause_btn': 'Пауза анимации',
@@ -679,6 +726,8 @@ translations = {
         'file': 'Файл',
         'master_settings': 'Основные настройки',
         # Tooltips
+        'tt_export_format_label': 'Выбрать формат экспорта для текстуры',
+        'tt_remove_frame_btn': 'Удалить выбранное изображение',
         'tt_gif_label': 'Просмотр загруженного GIF',
         'tt_gif_canvas': 'Загруженный GIF отображается здесь. Нажмите, чтобы загрузить GIF.',
         'tt_gif_settings': 'Настроить эффекты для GIF',

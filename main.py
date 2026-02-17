@@ -58,12 +58,15 @@ except ImportError:
     DEFAULT_KEYBOARD_LAYOUT = get_keyboard_layout()
     DEFAULT_LANGUAGE = get_system_language()
 
-    print(f"Tastaturlayout erkannt: {DEFAULT_KEYBOARD_LAYOUT}")
-    print(f"Systemsprache erkannt: {DEFAULT_LANGUAGE}")
+    import logging
+    logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
+    logging.info(f"Tastaturlayout erkannt: {DEFAULT_KEYBOARD_LAYOUT}")
+    logging.info(f"Systemsprache erkannt: {DEFAULT_LANGUAGE}")
 
 LANGUAGES = ['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt']
 
 class ModernApp:
+    # Entfernt: Fehlerhafte Zeile außerhalb von Methoden
 
     def show_texture(self):
         # Kompatibilitäts-Wrapper, damit show_texture(self) immer funktioniert
@@ -154,6 +157,7 @@ class ModernApp:
         self.export_format_label = None
         self.export_format_var = tk.StringVar(value='PNG')
         self.media_framerate_var = None  # Wird in gui_layout.py gesetzt
+        self.media_framerate_label = None  # Für Media-Framerate-Label (Tooltip/Übersetzung)
         self.playing = False
         try:
             self.root.iconbitmap("icon.ico")
@@ -410,16 +414,23 @@ class ModernApp:
             'maxframes_spin': 'tt_maxframes_spin',
             'reset_btn': 'tt_reset_btn',
             'media_group': 'tt_media_group',
+            'media_framerate_label': 'tt_media_framerate_label',
             'prev_btn': 'tt_prev_btn',
             'pause_btn': 'tt_pause_btn',
             'play_btn': 'tt_play_btn',
             'stop_btn': 'tt_stop_btn',
             'next_btn': 'tt_next_btn',
             'borderless_label': 'tt_borderless',
+            'export_format_label': 'tt_export_format_label',
         }
         for k, v in tooltip_keys.items():
             if k in self.tooltips:
                 self.tooltips[k].set_text(tr(v, l))
+        # Media-Framerate-Label und Tooltip übersetzen
+        if hasattr(self, 'media_framerate_label') and self.media_framerate_label is not None:
+            self.media_framerate_label.config(text=tr('framerate', l) or "Framerate:")
+        if 'media_framerate_label' in self.tooltips:
+            self.tooltips['media_framerate_label'].set_text(tr('tt_media_framerate_label', l))
         # Label für Randlos explizit übersetzen
         if hasattr(self, 'borderless_label') and self.borderless_label is not None:
             self.borderless_label.config(text=tr('borderless', l) or "Randlos")
@@ -464,6 +475,10 @@ class ModernApp:
             self.play_btn.config(text=tr('play', l) if not self.playing else tr('pause', l) or "")
         if self.add_frame_btn is not None:
             self.add_frame_btn.config(text=tr('add_frame', l) or "")
+        if self.remove_frame_btn is not None:
+            self.remove_frame_btn.config(text=tr('remove_frame', l) or "Entfernen")
+        if 'remove_frame_btn' in self.tooltips:
+            self.tooltips['remove_frame_btn'].set_text(tr('tt_remove_frame_btn', l))
         # Effekte-Labels aktualisieren
         for prefix in ("gif", "texture"):
             panel = getattr(self, f"{prefix}_settings", None)
@@ -508,7 +523,7 @@ class ModernApp:
         if self.framerate_label is not None:
             self.framerate_label.config(text=tr('framerate', l) or "Framerate:")
         if self.export_format_label is not None:
-            self.export_format_label.config(text=tr('export_format', l) or "Exportformat:")
+            self.export_format_label.config(text=tr('export_format', l) or "Exportformat:", bg="#FFB3A7", fg="black", height=1)
         if self.maxframes_label is not None:
             self.maxframes_label.config(text=tr('max_images', l) or "Max. Bilder:")
 
