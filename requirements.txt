@@ -1,0 +1,4 @@
+Pillow
+ttkbootstrap
+pyinstaller
+# Hinweis: tkinter ist Teil der Standardbibliothek und wird nicht über pip installiert.
