@@ -30,7 +30,7 @@ OSSL2Gif ist plattformübergreifend und läuft überall dort, wo Python 3.13 und
 - **pip** (meist mit Python installiert)
 - **tkinter** (bei Python fast immer schon dabei)
 - **Pillow** (für die Bildverarbeitung)
-- **Optional:** Für ein modernes Aussehen `ttkbootstrap`
+- **ttkbootstrap** (für ein modernes Aussehen)
 
 ## Installation – Schritt für Schritt
 
@@ -772,3 +772,4 @@ python -m pytest test_*.py
 - 1.x: Grundfunktionen (GIF laden, speichern, Effekte, Export)
 
 ---
+
