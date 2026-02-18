@@ -64,7 +64,7 @@ except ImportError:
     logging.info(f"Systemsprache erkannt: {DEFAULT_LANGUAGE}")
 
 LANGUAGES = ['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt']
-Version = "2.0.2"
+Version = "2.0.3"
 WindowsSize  = "1500x1400"
 
 class ModernApp:

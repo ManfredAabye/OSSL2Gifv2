@@ -167,7 +167,9 @@ def update_previews(self):
 	from image_processing import show_gif_frame
 	if self.gif_frames:
 		show_gif_frame(self)
-	else:
+	# Textur IMMER aktualisieren, wenn Frames vorhanden sind
+	if self.gif_frames and hasattr(self, 'show_texture'):
+		self.show_texture()
+	elif hasattr(self, 'show_texture'):
 		# Falls kein GIF, nur Textur mit aktuellem Hintergrund anzeigen
-		if hasattr(self, 'show_texture'):
-			self.show_texture()
+		self.show_texture()
