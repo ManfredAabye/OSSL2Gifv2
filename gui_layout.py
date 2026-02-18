@@ -3,10 +3,87 @@
 # This file contains the layout and GUI components for the OSSL2Gif application.
 # Version 2.0.0 © 2026 by Manfred Zainhofer
 ###
+
 import tkinter as tk
 from tkinter import ttk
+from PIL import Image, ImageDraw, ImageTk
 from translations import tr
 from tooltip import ToolTip
+
+# === Hilfsfunktion für Transparenz-Anzeige ===
+def create_checkerboard_with_color(hex_color, alpha=255, size=24, checker_size=4):
+	"""
+	Erstellt ein Schachbrett-Muster mit einer Farbe, die Transparenz anzeigt.
+	hex_color: z.B. "#FF0000"
+	alpha: 0-255 (0=transparent, 255=undurchsichtig)
+	size: Größe des Bildes in Pixeln
+	checker_size: Größe der Schachbrett-Quadrate
+	"""
+	# Schachbrett-Farben (grau/weiß)
+	checker_light = (200, 200, 200)
+	checker_dark = (100, 100, 100)
+	
+	# Farbe parsen
+	try:
+		r = int(hex_color[1:3], 16)
+		g = int(hex_color[3:5], 16)
+		b = int(hex_color[5:7], 16)
+	except:
+		r, g, b = 0, 0, 0
+	
+	# Bild mit RGBA-Modus erstellen
+	img = Image.new("RGBA", (size, size), (255, 255, 255, 0))
+	draw = ImageDraw.Draw(img)
+	
+	# Schachbrett zeichnen
+	for y in range(0, size, checker_size):
+		for x in range(0, size, checker_size):
+			if ((x // checker_size) + (y // checker_size)) % 2 == 0:
+				color = checker_light
+			else:
+				color = checker_dark
+			draw.rectangle([x, y, x + checker_size, y + checker_size], fill=color + (255,))
+	
+	# Farbe mit Alpha über Schachbrett legen
+	overlay = Image.new("RGBA", (size, size), (r, g, b, alpha))
+	img = Image.alpha_composite(img, overlay)
+	
+	return ImageTk.PhotoImage(img)
+
+# === Globale GUI-Design-Konstanten ===
+GUI_FONT_FAMILY = "Segoe UI"
+GUI_FONT_SIZE = 10
+GUI_FONT = (GUI_FONT_FAMILY, GUI_FONT_SIZE)
+GUI_LABEL_BG = "#f5f5f5"
+GUI_LABEL_FG = "black"
+# Standard-Button
+GUI_BUTTON_BG = "#e0e0e0"
+GUI_BUTTON_FG = "black"
+GUI_BUTTON_WIDTH = 8
+GUI_BUTTON_HEIGHT = 1
+# Erfolgs-Button (z.B. Laden)
+GUI_SUCCESS_BG = "#4CAF50"
+GUI_SUCCESS_FG = "white"
+GUI_SUCCESS_WIDTH = 8
+GUI_SUCCESS_HEIGHT = 1
+# Warn-/Löschen-Button (z.B. Reset, Clear)
+GUI_WARN_BG = "#e53935"
+GUI_WARN_FG = "white"
+GUI_WARN_WIDTH = 14
+GUI_WARN_HEIGHT = 1
+# Info-Button (z.B. Export)
+GUI_INFO_BG = "#90CAF9"
+GUI_INFO_FG = "black"
+GUI_INFO_WIDTH = 8
+GUI_INFO_HEIGHT = 1
+# Akzent-Button (z.B. Play, Next)
+GUI_ACCENT_BG = "#e0f7fa"
+GUI_ACCENT_FG = "black"
+GUI_ACCENT_WIDTH = 8
+GUI_ACCENT_HEIGHT = 1
+# Label-Größen
+GUI_LABEL_WIDTH = 12
+GUI_LABEL_HEIGHT = 1
 
 def create_effects_panel(self, parent, prefix):
 	frame = ttk.LabelFrame(parent, text=tr(f'{prefix}_settings', self.lang) or "")
@@ -86,7 +163,16 @@ def create_effects_panel(self, parent, prefix):
 	return frame
 
 def build_layout(self):
-    # Initialisierung für frame_select_var (wird für Spinbox benötigt)
+	# --- Theme-Auswahl (nur wenn ttkbootstrap verfügbar) ---
+	try:
+		import ttkbootstrap as tb
+		THEME_AVAILABLE = True
+	except ImportError:
+		tb = None
+		THEME_AVAILABLE = False
+	# Initialisierung für frame_select_var (wird für Spinbox benötigt)
+    
+	# Initialisierung für frame_select_var (wird für Spinbox benötigt)
 	self.frame_select_var = tk.IntVar(value=0)
 
 	# Haupt-Layout: 2 Spalten, unten Einstellungen
@@ -148,14 +234,7 @@ def build_layout(self):
 	self.file_group = ttk.LabelFrame(main, text=tr('file', self.lang) or "Datei")
 	self.file_group.pack(fill=tk.X, padx=10, pady=(12,2))
 	# --- Datei-Gruppe Controls ---
-	export_format_frame = ttk.Frame(self.file_group)
-	export_format_frame.pack(side=tk.LEFT, padx=5)
-	self.export_format_label = tk.Label(export_format_frame, text=tr('export_format', self.lang) or "Exportformat:", bg="#FFB3A7", fg="black", height=1, padx=8, pady=0)
-	self.export_format_label.pack(side=tk.LEFT, ipadx=0, ipady=0, padx=2, pady=2, fill=tk.Y)
-	self.tooltips['export_format_label'] = ToolTip(self.export_format_label, tr('tt_export_format_label', self.lang))
-	self.export_format_var = tk.StringVar(value="PNG")
-	self.export_format_combo = ttk.Combobox(export_format_frame, values=["PNG", "JPG", "BMP"], textvariable=self.export_format_var, width=5, state="readonly")
-	self.export_format_combo.pack(side=tk.LEFT)
+
 	# Datei-Buttons: Laden, Speichern, Exportieren, Clear
 	try:
 		import ttkbootstrap as tb
@@ -178,6 +257,11 @@ def build_layout(self):
 	self.export_lsl_btn = ttk.Button(self.file_group, text=tr('export_lsl', self.lang) or "LSL exportieren", command=self.export_lsl)
 	self.export_lsl_btn.pack(side=tk.LEFT, padx=2, pady=2)
 	self.tooltips['export_lsl_btn'] = ToolTip(self.export_lsl_btn, tr('tt_export_lsl_btn', self.lang))
+
+	# Button: Einzelbilder (ZIP/Ordner) zu GIF
+	self.import_frames_btn = ttk.Button(self.file_group, text=tr('import_frames', self.lang) or "Bilder zu GIF", command=self.import_frames_to_gif)
+	self.import_frames_btn.pack(side=tk.LEFT, padx=2, pady=2)
+	self.tooltips['import_frames_btn'] = ToolTip(self.import_frames_btn, tr('tt_import_frames_btn', self.lang))
 	# Clear Button
 	if THEME_AVAILABLE and tb is not None:
 		style = tb.Style()
@@ -192,17 +276,17 @@ def build_layout(self):
 	media_row.pack(fill=tk.X)
 	self.playing = False
 
-	# Geschwindigkeit/Framerate-Slider für Media Play
-	framerate_row = ttk.Frame(self.media_group)
-	framerate_row.pack(fill=tk.X, pady=(4,2))
-	self.media_framerate_label = ttk.Label(framerate_row, text=tr('framerate', self.lang) or "Framerate:", width=12, anchor="w")
-	self.media_framerate_label.pack(side=tk.LEFT, padx=(0,4))
-	self.tooltips['media_framerate_label'] = ToolTip(self.media_framerate_label, tr('tt_media_framerate_label', self.lang))
-	self.media_framerate_var = tk.IntVar(value=100)
-	self.media_framerate_slider = ttk.Scale(framerate_row, from_=1, to=1000, orient=tk.HORIZONTAL, variable=self.media_framerate_var, length=120)
-	self.media_framerate_slider.pack(side=tk.LEFT, padx=4)
-	self.media_framerate_value = ttk.Label(framerate_row, textvariable=self.media_framerate_var, width=4)
-	self.media_framerate_value.pack(side=tk.LEFT)
+	# Geschwindigkeit/Abspielrate-Slider für Media Play
+	playrate_row = ttk.Frame(self.media_group)
+	playrate_row.pack(fill=tk.X, pady=(4,2))
+	self.media_playrate_label = ttk.Label(playrate_row, text=tr('playrate', self.lang) or "Abspielrate:", width=12, anchor="w")
+	self.media_playrate_label.pack(side=tk.LEFT, padx=(0,4))
+	self.tooltips['media_playrate_label'] = ToolTip(self.media_playrate_label, tr('tt_media_playrate_label', self.lang))
+	self.media_playrate_var = tk.IntVar(value=100)
+	self.media_playrate_slider = ttk.Scale(playrate_row, from_=10, to=500, orient=tk.HORIZONTAL, variable=self.media_playrate_var, length=120)
+	self.media_playrate_slider.pack(side=tk.LEFT, padx=4)
+	self.media_playrate_value = ttk.Label(playrate_row, text="100%", width=4)
+	self.media_playrate_value.pack(side=tk.LEFT)
 	if THEME_AVAILABLE and tb is not None:
 		style = tb.Style()
 		style.configure("PastellPrev.TButton", background="#B39DDB", foreground="black")
@@ -251,6 +335,40 @@ def build_layout(self):
 	self.height_entry = ttk.Entry(size_row, textvariable=self.height_var, width=5)
 	self.height_entry.pack(side=tk.LEFT, padx=2)
 	self.tooltips['height_entry'] = ToolTip(self.height_entry, tr('tt_height_entry', self.lang))
+
+	# Preview auch bei manueller Eingabe aktualisieren
+	def _update_preview_if_gif_loaded(*args):
+		if hasattr(self, 'gif_image') and self.gif_image is not None:
+			try:
+				from image_processing import show_texture
+				show_texture(self)
+			except Exception:
+				pass
+	self.width_var.trace_add('write', _update_preview_if_gif_loaded)
+	self.height_var.trace_add('write', _update_preview_if_gif_loaded)
+
+	# Preset-Combobox für Bildgrößen
+	def set_image_size_from_preset(event=None):
+		preset = self.size_preset_var.get()
+		try:
+			val = int(preset)
+			self.width_var.set(val)
+			self.height_var.set(val)
+			# Automatisch Preview aktualisieren, falls GIF geladen
+			if hasattr(self, 'gif_image') and self.gif_image is not None:
+				try:
+					from image_processing import show_texture
+					show_texture(self)
+				except Exception:
+					pass
+		except Exception:
+			pass
+
+	self.size_preset_var = tk.StringVar()
+	self.size_preset_combo = ttk.Combobox(size_row, values=["128", "256", "512", "768", "1024", "1280", "1536", "1792", "2048"], textvariable=self.size_preset_var, width=5, state="readonly")
+	self.size_preset_combo.pack(side=tk.LEFT, padx=(8,0))
+	self.size_preset_combo.bind("<<ComboboxSelected>>", set_image_size_from_preset)
+	self.tooltips['size_preset_combo'] = ToolTip(self.size_preset_combo, tr('tt_size_preset_combo', self.lang))
 	# Bindings werden in main.py gesetzt
 	# Bildrate
 	framerate_row = ttk.Frame(left_frame)
@@ -288,7 +406,9 @@ def build_layout(self):
 	self.tooltips['bg_label'] = ToolTip(self.bg_label, tr('tt_bg_label', self.lang))
 	self.bg_color = "#00000000"
 	self.bg_box_color = "#000000"
-	self.bg_color_box = tk.Label(bg_row, width=3, relief=tk.SUNKEN, bg=self.bg_box_color, cursor="hand2")
+	# PhotoImage für Transparenz-Anzeige mit Schachbrett-Pattern
+	self.bg_color_photo = create_checkerboard_with_color(self.bg_box_color, alpha=0, size=32, checker_size=4)
+	self.bg_color_box = tk.Label(bg_row, image=self.bg_color_photo, relief=tk.SUNKEN, cursor="hand2", width=32, height=32)
 	self.bg_color_box.pack(side=tk.LEFT, padx=2)
 	# Bindings werden in main.py gesetzt
 	self.tooltips['bg_color_box'] = ToolTip(self.bg_color_box, tr('tt_bg_color_box', self.lang))
@@ -336,30 +456,91 @@ def build_layout(self):
 		self.remove_frame_btn = ttk.Button(add_row, text="Entfernen")
 	self.remove_frame_btn.pack(side=tk.RIGHT, padx=(0,4))
 	self.tooltips['remove_frame_btn'] = ToolTip(self.remove_frame_btn, "Bild entfernen")
-	# Rechter Rahmen: Sprache, Reset (jeweils Label links, Wert/Button rechts)
+
+	# Rechter Rahmen: Sprache, Theme, Exportformat, Reset (jeweils Label links, Wert/Button rechts)
 	right_frame = ttk.LabelFrame(master_row)
 	right_frame.pack(side=tk.LEFT, padx=5, fill=tk.Y)
 	# Sprache
 	lang_row = ttk.Frame(right_frame)
 	lang_row.pack(fill=tk.X, pady=(4,2))
-	self.lang_label = ttk.Label(lang_row, text=tr('language', self.lang) or "", background="#eeec7d", foreground="black", relief=tk.FLAT, borderwidth=1, width=12, anchor="w", font=("Segoe UI", 10))
+	self.lang_label = ttk.Label(
+		lang_row,
+		text=tr('language', self.lang) or "",
+		background="#eeec7d",
+		foreground=GUI_LABEL_FG,
+		relief=tk.FLAT,
+		borderwidth=1,
+		width=GUI_LABEL_WIDTH,
+		anchor="w",
+		font=GUI_FONT
+	)
 	self.lang_label.pack(side=tk.LEFT, padx=(0,4), ipady=6)
 	self.tooltips['lang_label'] = ToolTip(self.lang_label, tr('tt_lang_label', self.lang))
 	self.lang_var = tk.StringVar(value=self.lang)
-	self.lang_combo = ttk.Combobox(lang_row, values=['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt'], textvariable=self.lang_var, width=6, state="readonly")
+	self.lang_combo = ttk.Combobox(lang_row, values=['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt'], textvariable=self.lang_var, width=6, state="readonly", font=GUI_FONT)
 	self.lang_combo.pack(side=tk.LEFT)
 	self.tooltips['lang_combo'] = ToolTip(self.lang_combo, tr('tt_lang_combo', self.lang))
 	# Bindings werden in main.py gesetzt
-	# Reset
-	reset_row = ttk.Frame(right_frame)
+
+	# Theme-Auswahl zwischen Sprache und Exportformat
+	if THEME_AVAILABLE and tb is not None:
+		theme_row = ttk.Frame(right_frame)
+		theme_row.pack(fill=tk.X, pady=(4,2))
+		theme_label = ttk.Label(theme_row, text=tr('theme', self.lang) or "Theme:", background="#e0e0e0", foreground="black", relief=tk.FLAT, borderwidth=1, width=GUI_LABEL_WIDTH, anchor="w", font=GUI_FONT)
+		theme_label.pack(side=tk.LEFT, padx=(0,4), ipady=6)
+		self.tooltips['theme_label'] = ToolTip(theme_label, tr('tt_theme_label', self.lang) or "Wähle das Farbschema für die Oberfläche.")
+		self.theme_label = theme_label
+		current_theme = None
+		theme_names = []
+		if tb is not None:
+			style = tb.Style()
+			current_theme = getattr(style.theme, 'name', None) if getattr(style, 'theme', None) is not None else None
+			theme_names = sorted(style.theme_names())
+		else:
+			import tkinter.ttk as ttk_mod
+			style = ttk_mod.Style()
+		self.theme_var = tk.StringVar(value=current_theme or "")
+		self.theme_combo = ttk.Combobox(theme_row, textvariable=self.theme_var, values=theme_names, state="readonly", width=13, font=GUI_FONT)
+		self.theme_combo.pack(side=tk.LEFT, padx=2)
+		def on_theme_change(event=None):
+			if tb is not None:
+				new_theme = self.theme_var.get()
+				tb.Style().theme_use(new_theme)
+		self.theme_combo.bind('<<ComboboxSelected>>', on_theme_change)
+		self.tooltips['theme_combo'] = ToolTip(self.theme_combo, tr('tt_theme_combo', self.lang) or "Theme-Auswahl für die Oberfläche.")
+
+	# Exportformat in Master Einstellungen (rechter Rahmen) einfügen
+	export_format_row = ttk.Frame(right_frame)
+	export_format_row.pack(fill=tk.X, pady=(4,2))
+	self.export_format_label = ttk.Label(
+		export_format_row,
+		text=tr('export_format', self.lang) or "Exportformat:",
+		background="#FFB3A7",
+		foreground=GUI_LABEL_FG,
+		relief=tk.FLAT,
+		borderwidth=1,
+		width=GUI_LABEL_WIDTH,
+		anchor="w",
+		font=GUI_FONT
+	)
+	self.export_format_label.pack(side=tk.LEFT, padx=(0,4), ipady=6)
+	self.tooltips['export_format_label'] = ToolTip(self.export_format_label, tr('tt_export_format_label', self.lang))
+	self.export_format_var = tk.StringVar(value="PNG")
+	self.export_format_combo = ttk.Combobox(export_format_row, values=["PNG", "JPG", "BMP", "ZIP"], textvariable=self.export_format_var, width=6, state="readonly", font=GUI_FONT)
+	self.export_format_combo.pack(side=tk.LEFT)
+
+	# Reset in eigenen vierten Rahmen ganz rechts
+	reset_frame = ttk.LabelFrame(master_row)
+	reset_frame.pack(side=tk.LEFT, padx=5, fill=tk.Y)
+	reset_row = ttk.Frame(reset_frame)
 	reset_row.pack(fill=tk.X, pady=(8,2))
 	if THEME_AVAILABLE and tb is not None:
 		style = tb.Style()
-		style.configure("RedReset.TButton", background="#e53935", foreground="white")
-		self.reset_btn = tb.Button(reset_row, text="Reset", style="RedReset.TButton")
+		style.configure("RedReset.TButton", background=GUI_WARN_BG, foreground=GUI_WARN_FG)
+		self.reset_btn = tb.Button(reset_row, text=tr('reset', self.lang) or "Reset", style="RedReset.TButton", width=GUI_WARN_WIDTH)
 	else:
-		self.reset_btn = tk.Button(reset_row, text="Reset", bg="#e53935", fg="white", activebackground="#b71c1c", activeforeground="white")
-	self.reset_btn.pack(side=tk.LEFT, padx=8)
+		self.reset_btn = tk.Button(reset_row, text=tr('reset', self.lang) or "Reset", bg=GUI_WARN_BG, fg=GUI_WARN_FG, activebackground="#b71c1c", activeforeground="white", width=GUI_WARN_WIDTH, height=GUI_WARN_HEIGHT, font=GUI_FONT)
+	self.reset_btn.pack(side=tk.LEFT, padx=8, ipady=6)
 	self.tooltips['reset_btn'] = ToolTip(self.reset_btn, tr('tt_reset_btn', self.lang))
 
 	# --- Status-Gruppe ---

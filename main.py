@@ -12,9 +12,9 @@ import atexit
 from config import load_config, save_config
 from translations import tr
 from gui_layout import build_layout, create_effects_panel
-from image_processing import apply_effects, show_gif_frame, show_texture, update_previews
+from image_processing import apply_effects, show_gif_frame, show_texture
 from file_ops import load_gif, save_gif, save_texture, export_lsl, generate_lsl_script
-from events import reset_settings, change_language, on_maxframes_changed, add_selected_frame_to_texture, choose_bg_color
+from events import reset_settings, change_language, on_maxframes_changed, add_selected_frame_to_texture, choose_bg_color, set_transparent_bg
 
 try:
     import ttkbootstrap as tb
@@ -64,8 +64,67 @@ except ImportError:
     logging.info(f"Systemsprache erkannt: {DEFAULT_LANGUAGE}")
 
 LANGUAGES = ['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt']
+Version = "2.0.2"
+WindowsSize  = "1500x1400"
 
 class ModernApp:
+    def _bind_effects_panel_events(self):
+        """Bindet alle Effekt-Einstellungen an ihre jeweiligen Update-Funktionen."""
+        # Hilfsfunktion: Trace auf Variable-Änderung mit sofortiger Aktualisierung
+        def create_trace_callback(effect_type, is_gif=True):
+            def callback(*args):
+                if is_gif:
+                    self._apply_gif_effect(effect_type)
+                else:
+                    self._apply_texture_effect(effect_type)
+            return callback
+        
+        # GIF-Effekte binding
+        for effect in ['grayscale', 'sharpen', 'blur', 'transparency', 'colorintensity_active']:
+            var_name = f'gif_{effect}'
+            if hasattr(self, var_name):
+                var = getattr(self, var_name)
+                var.trace_add('write', create_trace_callback(effect.replace('_active', ''), is_gif=True))
+        
+        # GIF-Wert-Slider binding
+        for effect in ['sharpen_value', 'blur_value', 'transparency_value', 'colorintensity']:
+            var_name = f'gif_{effect}'
+            if hasattr(self, var_name):
+                var = getattr(self, var_name)
+                var.trace_add('write', create_trace_callback(effect, is_gif=True))
+        
+        # Textur-Effekte binding
+        for effect in ['grayscale', 'sharpen', 'blur', 'transparency', 'colorintensity_active']:
+            var_name = f'texture_{effect}'
+            if hasattr(self, var_name):
+                var = getattr(self, var_name)
+                var.trace_add('write', create_trace_callback(effect.replace('_active', ''), is_gif=False))
+        
+        # Textur-Wert-Slider binding
+        for effect in ['sharpen_value', 'blur_value', 'transparency_value', 'colorintensity']:
+            var_name = f'texture_{effect}'
+            if hasattr(self, var_name):
+                var = getattr(self, var_name)
+                var.trace_add('write', create_trace_callback(effect, is_gif=False))
+
+    def _apply_gif_effect(self, effect_type):
+        if not self.gif_frames:
+            return
+        # Effekte werden nur bei der Anzeige angewendet, nicht hier auf den Frames selbst gespeichert
+        self.show_gif_frame()
+        if hasattr(self, 'root') and self.root:
+            self.root.update_idletasks()
+
+    def _apply_texture_effect(self, effect_type):
+        if not self.gif_frames:
+            return
+        # Effekte werden nur bei der Anzeige angewendet, nicht hier auf den Frames selbst gespeichert
+        self.show_texture()
+        if hasattr(self, 'root') and self.root:
+            self.root.update_idletasks()
+    def import_frames_to_gif(self):
+        from file_ops import import_frames_to_gif
+        import_frames_to_gif(self)
     # Entfernt: Fehlerhafte Zeile außerhalb von Methoden
 
     def show_texture(self):
@@ -94,6 +153,9 @@ class ModernApp:
 
     def __init__(self, root):
         self.root = root
+        self._ensure_file_ops_methods()
+        from image_processing import show_gif_frame
+        self.show_gif_frame = show_gif_frame.__get__(self)
         # Sprache initial aus Combobox übernehmen, falls vorhanden, sonst Standard
         self.lang = 'de'
         self.lang_var = None
@@ -105,9 +167,30 @@ class ModernApp:
         self.timer = None
         self.image_width = 2048
         self.image_height = 2048
-        self.root.title("OSSL2Gif")
-        self.root.geometry("1500x1300")
-        
+        self.root.title(f"OSSL2Gif {Version}")
+        self.root.geometry(WindowsSize)
+
+        # Effekt-Variablen initialisieren (für Pylance und Code-Vervollständigung)
+        self.gif_sharpen_value = tk.DoubleVar(value=2.5)
+        self.gif_blur_value = tk.DoubleVar(value=3.5)
+        self.gif_transparency_value = tk.DoubleVar(value=0.5)
+        self.gif_colorintensity = tk.DoubleVar(value=0.5)
+        self.gif_grayscale = tk.BooleanVar(value=False)
+        self.gif_sharpen = tk.BooleanVar(value=False)
+        self.gif_blur = tk.BooleanVar(value=False)
+        self.gif_transparency = tk.BooleanVar(value=False)
+        self.gif_colorintensity_active = tk.BooleanVar(value=False)
+
+        self.texture_sharpen_value = tk.DoubleVar(value=2.5)
+        self.texture_blur_value = tk.DoubleVar(value=3.5)
+        self.texture_transparency_value = tk.DoubleVar(value=0.5)
+        self.texture_colorintensity = tk.DoubleVar(value=0.5)
+        self.texture_grayscale = tk.BooleanVar(value=False)
+        self.texture_sharpen = tk.BooleanVar(value=False)
+        self.texture_blur = tk.BooleanVar(value=False)
+        self.texture_transparency = tk.BooleanVar(value=False)
+        self.texture_colorintensity_active = tk.BooleanVar(value=False)
+
         # Initialize dynamically set GUI attributes
         self.gif_label = None
         self.gif_canvas = None
@@ -119,6 +202,9 @@ class ModernApp:
         self.status_group = None
         self.file_group = None
         self.master_group = None
+        self.theme_label = None  # Für Theme-Label (wird in gui_layout.py gesetzt)
+        self.theme_combo = None  # Für Theme-Combobox (wird in gui_layout.py gesetzt)
+        self.theme_var = None    # Für Theme-Variable (wird in gui_layout.py gesetzt)
         self.width_entry = None
         self.width_var = tk.IntVar(value=2048)
         self.height_entry = None
@@ -129,10 +215,12 @@ class ModernApp:
         self.save_texture_btn = None
         self.export_lsl_btn = None
         self.clear_btn = None
+        self.import_frames_btn = None  # Für "Bilder zu GIF"-Button
         self.size_label = None
         self.bg_label = None
         self.bg_color_box = None
-        self.bg_color = '#000000'
+        self.bg_color_photo = None  # PhotoImage für Transparenz-Anzeige
+        self.bg_color = '#00000000'
         self.bg_box_color = '#000000'
         self.framerate_label = None
         self.framerate_var = tk.IntVar(value=10)
@@ -156,8 +244,8 @@ class ModernApp:
         self.borderless_chk = None
         self.export_format_label = None
         self.export_format_var = tk.StringVar(value='PNG')
-        self.media_framerate_var = None  # Wird in gui_layout.py gesetzt
-        self.media_framerate_label = None  # Für Media-Framerate-Label (Tooltip/Übersetzung)
+        self.media_playrate_var = None  # Wird in gui_layout.py gesetzt
+        self.media_playrate_label = None  # Für Media-Abspielrate-Label (Tooltip/Übersetzung)
         self.playing = False
         try:
             self.root.iconbitmap("icon.ico")
@@ -178,59 +266,22 @@ class ModernApp:
         if hasattr(self, 'lang_var') and self.lang_var is not None:
             self.lang = self.lang_var.get()
         self.update_language()
+        # Bindings für Effekte-Panels IMMER setzen
+        self._bind_effects_panel_events()
         # Beim Beenden speichern
         atexit.register(self.save_config)
-        
+
         # --- Event-Bindings zentral setzen ---
         # Entfernen-Button für Frames verbinden
         if hasattr(self, 'remove_frame_btn') and self.remove_frame_btn is not None:
             from events import remove_selected_frame_from_texture
             self.remove_frame_btn.config(command=lambda: remove_selected_frame_from_texture(self))
-        # Effekte-Panel (GIF)
-        if self.gif_settings is not None and hasattr(self.gif_settings, 'grayscale_check'):
-            self.gif_settings.grayscale_check.config(command=lambda: update_previews(self))
-        if self.gif_settings is not None and hasattr(self.gif_settings, 'sharpen_check'):
-            self.gif_settings.sharpen_check.config(command=lambda: update_previews(self))
-        if self.gif_settings is not None and hasattr(self.gif_settings, 'sharpen_scale'):
-            self.gif_settings.sharpen_scale.config(command=lambda e: update_previews(self))
-        if self.gif_settings is not None and hasattr(self.gif_settings, 'blur_check'):
-            self.gif_settings.blur_check.config(command=lambda: update_previews(self))
-        if self.gif_settings is not None and hasattr(self.gif_settings, 'blur_scale'):
-            self.gif_settings.blur_scale.config(command=lambda e: update_previews(self))
-        if self.gif_settings is not None and hasattr(self.gif_settings, 'transparency_check'):
-            self.gif_settings.transparency_check.config(command=lambda: update_previews(self))
-        if self.gif_settings is not None and hasattr(self.gif_settings, 'transparency_scale'):
-            self.gif_settings.transparency_scale.config(command=lambda e: update_previews(self))
-        if self.gif_settings is not None and hasattr(self.gif_settings, 'colorint_check'):
-            self.gif_settings.colorint_check.config(command=lambda: update_previews(self))
-        if self.gif_settings is not None and hasattr(self.gif_settings, 'colorint_scale'):
-            self.gif_settings.colorint_scale.config(command=lambda e: update_previews(self))
-
-        # Effekte-Panel (Textur)
-        if self.texture_settings is not None and hasattr(self.texture_settings, 'grayscale_check'):
-            self.texture_settings.grayscale_check.config(command=lambda: update_previews(self))
-        if self.texture_settings is not None and hasattr(self.texture_settings, 'sharpen_check'):
-            self.texture_settings.sharpen_check.config(command=lambda: update_previews(self))
-        if self.texture_settings is not None and hasattr(self.texture_settings, 'sharpen_scale'):
-            self.texture_settings.sharpen_scale.config(command=lambda e: update_previews(self))
-        if self.texture_settings is not None and hasattr(self.texture_settings, 'blur_check'):
-            self.texture_settings.blur_check.config(command=lambda: update_previews(self))
-        if self.texture_settings is not None and hasattr(self.texture_settings, 'blur_scale'):
-            self.texture_settings.blur_scale.config(command=lambda e: update_previews(self))
-        if self.texture_settings is not None and hasattr(self.texture_settings, 'transparency_check'):
-            self.texture_settings.transparency_check.config(command=lambda: update_previews(self))
-        if self.texture_settings is not None and hasattr(self.texture_settings, 'transparency_scale'):
-            self.texture_settings.transparency_scale.config(command=lambda e: update_previews(self))
-        if self.texture_settings is not None and hasattr(self.texture_settings, 'colorint_check'):
-            self.texture_settings.colorint_check.config(command=lambda: update_previews(self))
-        if self.texture_settings is not None and hasattr(self.texture_settings, 'colorint_scale'):
-            self.texture_settings.colorint_scale.config(command=lambda e: update_previews(self))
 
         # Bildgröße-Eingaben
         if self.width_entry is not None:
-            self.width_entry.bind('<FocusOut>', lambda e: update_previews(self))
+            self.width_entry.bind('<FocusOut>', lambda e: (self.show_gif_frame(), self.show_texture()))
         if self.height_entry is not None:
-            self.height_entry.bind('<FocusOut>', lambda e: update_previews(self))
+            self.height_entry.bind('<FocusOut>', lambda e: (self.show_gif_frame(), self.show_texture()))
 
         # Maxframes
         if self.maxframes_spin is not None:
@@ -240,11 +291,12 @@ class ModernApp:
         # Hintergrundfarbe
         if self.bg_color_box is not None:
             self.bg_color_box.bind('<Button-1>', lambda e: choose_bg_color(self, e))
+            self.bg_color_box.bind('<Button-3>', lambda e: set_transparent_bg(self))
 
         # Randlos
-        self.borderless_var.trace_add('write', lambda *args: update_previews(self))
+        self.borderless_var.trace_add('write', lambda *args: (self.show_gif_frame(), self.show_texture()))
         if self.borderless_chk is not None:
-            self.borderless_chk.config(command=lambda: update_previews(self))
+            self.borderless_chk.config(command=lambda: (self.show_gif_frame(), self.show_texture()))
 
         # Bild hinzufügen
         if self.add_frame_btn is not None:
@@ -268,13 +320,23 @@ class ModernApp:
             'borderless': self.borderless_var.get() if hasattr(self, 'borderless_var') and self.borderless_var is not None else 0,
             'framerate': self.framerate_var.get() if hasattr(self, 'framerate_var') and self.framerate_var is not None else 10,
             'export_format': self.export_format_var.get() if hasattr(self, 'export_format_var') and self.export_format_var is not None else 'PNG',
-            'maxframes': self.maxframes_var.get() if hasattr(self, 'maxframes_var') and self.maxframes_var is not None else 64
+            'maxframes': self.maxframes_var.get() if hasattr(self, 'maxframes_var') and self.maxframes_var is not None else 64,
+            'theme': self.theme_var.get() if hasattr(self, 'theme_var') and self.theme_var is not None else None
         }
 
     def save_config(self):
-        save_config(self.get_config())
+        save_config(self)
 
     def apply_config(self, config):
+        if 'theme' in config and hasattr(self, 'theme_var') and self.theme_var is not None:
+            self.theme_var.set(config['theme'])
+            # Theme auch auf ttkbootstrap anwenden, falls verfügbar
+            try:
+                import ttkbootstrap as tb
+                if config['theme']:
+                    tb.Style().theme_use(config['theme'])
+            except Exception:
+                pass
         # Werte aus config dict auf GUI anwenden
         if 'lang' in config and self.lang_var is not None:
             self.lang_var.set(config['lang'])
@@ -285,16 +347,26 @@ class ModernApp:
             self.height_var.set(config['height'])
         if 'bg_color' in config and self.bg_color_box is not None:
             color = config['bg_color']
-            # Prüfe, ob die Farbe gültig ist (Tkinter akzeptiert keine 8-stelligen Hexwerte)
-            if isinstance(color, str) and (len(color) == 7 or (len(color) == 9 and color.endswith('00'))):
-                # Falls 8-stellig, entferne Alpha
+            # Prüfe, ob die Farbe gültig ist (mit oder ohne Alpha)
+            if isinstance(color, str) and len(color) >= 7:
+                # Verarbeite RGBA Format (#RRGGBBAA)
                 if len(color) == 9:
-                    color = color[:7]
+                    self.bg_color = color
+                    self.bg_box_color = color[:7]
+                    alpha_value = int(color[7:9], 16)
+                else:
+                    self.bg_color = color + '00'  # Transparent
+                    self.bg_box_color = color
+                    alpha_value = 0
             else:
                 color = '#000000'
-            self.bg_color = color
-            self.bg_box_color = color
-            self.bg_color_box.config(bg=self.bg_box_color)
+                self.bg_color = '#00000000'
+                self.bg_box_color = color
+                alpha_value = 0
+            # Update Schachbrett-Pattern
+            from gui_layout import create_checkerboard_with_color
+            self.bg_color_photo = create_checkerboard_with_color(self.bg_box_color, alpha=alpha_value, size=32, checker_size=4)
+            self.bg_color_box.config(image=self.bg_color_photo)
         if 'borderless' in config:
             self.borderless_var.set(config['borderless'])
         if 'framerate' in config:
@@ -314,6 +386,8 @@ class ModernApp:
         self.texture_canvas = getattr(self, 'texture_canvas', None)
         self.gif_canvas = getattr(self, 'gif_canvas', None)
         self.file_group = getattr(self, 'file_group', None)
+        # Nach dem Anwenden der Config: Effekt-Panel-Bindings erneut setzen
+        self._bind_effects_panel_events()
 
     def build_layout(self):
         build_layout(self)
@@ -343,11 +417,14 @@ class ModernApp:
         if not self.playing or not self.gif_frames:
             return
         self.current_frame = (self.current_frame + 1) % self.frame_count
-        show_gif_frame(self)
+        # Frame-Anzeige in Thread auslagern für flüssigere UI
+        import threading
+        threading.Thread(target=lambda: show_gif_frame(self), daemon=True).start()
         # Media-Play-Geschwindigkeit: Slider aus Media-Bereich bevorzugen
         delay = 100
-        if hasattr(self, 'media_framerate_var') and self.media_framerate_var is not None:
-            delay = self.media_framerate_var.get()
+        if hasattr(self, 'media_playrate_var') and self.media_playrate_var is not None:
+            playrate = self.media_playrate_var.get()
+            delay = int(10000 / playrate)  # Konvertiere Prozentatz zu Verzögerung in ms
         elif self.framerate_var is not None:
             delay = self.framerate_var.get()
         self.root.after(delay, self._run_animation)
@@ -361,7 +438,9 @@ class ModernApp:
     def stop_animation(self):
         self.playing = False
         self.current_frame = 0
-        show_gif_frame(self)
+        # Frame-Anzeige in Thread auslagern für flüssigere UI
+        import threading
+        threading.Thread(target=lambda: show_gif_frame(self), daemon=True).start()
         # Play/Pause-Button immer auf "Abspielen" (Play) setzen, auch sprachabhängig
         if self.play_btn is not None:
             self.play_btn.config(text=tr('play', self.lang) or "Play ▶")
@@ -370,13 +449,17 @@ class ModernApp:
         if not self.gif_frames:
             return
         self.current_frame = (self.current_frame + 1) % self.frame_count
-        show_gif_frame(self)
+        # Frame-Anzeige in Thread auslagern für flüssigere UI
+        import threading
+        threading.Thread(target=lambda: show_gif_frame(self), daemon=True).start()
 
     def step_backward(self):
         if not self.gif_frames:
             return
         self.current_frame = (self.current_frame - 1) % self.frame_count
-        show_gif_frame(self)
+        # Frame-Anzeige in Thread auslagern für flüssigere UI
+        import threading
+        threading.Thread(target=lambda: show_gif_frame(self), daemon=True).start()
 
 
 
@@ -386,6 +469,11 @@ class ModernApp:
 
     def update_language(self):
         l = self.lang
+        # Import Frames Button und Tooltip aktualisieren
+        if hasattr(self, 'import_frames_btn') and self.import_frames_btn is not None:
+            self.import_frames_btn.config(text=tr('import_frames', l) or "Bilder zu GIF")
+        if 'import_frames_btn' in self.tooltips:
+            self.tooltips['import_frames_btn'].set_text(tr('tt_import_frames_btn', l))
         # Tooltips dynamisch aktualisieren
         tooltip_keys = {
             'gif_label': 'tt_gif_label',
@@ -414,7 +502,7 @@ class ModernApp:
             'maxframes_spin': 'tt_maxframes_spin',
             'reset_btn': 'tt_reset_btn',
             'media_group': 'tt_media_group',
-            'media_framerate_label': 'tt_media_framerate_label',
+            'media_playrate_label': 'tt_media_playrate_label',
             'prev_btn': 'tt_prev_btn',
             'pause_btn': 'tt_pause_btn',
             'play_btn': 'tt_play_btn',
@@ -422,15 +510,27 @@ class ModernApp:
             'next_btn': 'tt_next_btn',
             'borderless_label': 'tt_borderless',
             'export_format_label': 'tt_export_format_label',
+            'size_preset_combo': 'tt_size_preset_combo',
         }
         for k, v in tooltip_keys.items():
             if k in self.tooltips:
                 self.tooltips[k].set_text(tr(v, l))
-        # Media-Framerate-Label und Tooltip übersetzen
-        if hasattr(self, 'media_framerate_label') and self.media_framerate_label is not None:
-            self.media_framerate_label.config(text=tr('framerate', l) or "Framerate:")
-        if 'media_framerate_label' in self.tooltips:
-            self.tooltips['media_framerate_label'].set_text(tr('tt_media_framerate_label', l))
+        # Media-Abspielrate-Label und Tooltip übersetzen
+        if hasattr(self, 'media_playrate_label') and self.media_playrate_label is not None:
+            self.media_playrate_label.config(text=tr('playrate', l) or "Abspielrate:")
+        if 'media_playrate_label' in self.tooltips:
+            self.tooltips['media_playrate_label'].set_text(tr('tt_media_playrate_label', l))
+        # Theme-Label und Combobox übersetzen (analog zu anderen Labels)
+        if hasattr(self, 'theme_label') and self.theme_label is not None:
+            theme_text = tr('theme', l) or tr('theme', 'en') or 'Theme:'
+            self.theme_label.config(text=theme_text)
+        if 'theme_label' in self.tooltips:
+            tt_theme_label = tr('tt_theme_label', l) or tr('tt_theme_label', 'en') or 'Theme-Label-Tooltip'
+            self.tooltips['theme_label'].set_text(tt_theme_label)
+        if hasattr(self, 'theme_combo') and self.theme_combo is not None:
+            if 'theme_combo' in self.tooltips:
+                tt_theme_combo = tr('tt_theme_combo', l) or tr('tt_theme_combo', 'en') or 'Theme-Combo-Tooltip'
+                self.tooltips['theme_combo'].set_text(tt_theme_combo)
         # Label für Randlos explizit übersetzen
         if hasattr(self, 'borderless_label') and self.borderless_label is not None:
             self.borderless_label.config(text=tr('borderless', l) or "Randlos")
@@ -467,7 +567,11 @@ class ModernApp:
             self.media_group.config(text=tr('media', l) or "Media")
         # Buttons
         if self.clear_btn is not None:
-            self.clear_btn.config(text=tr('clear', l) or "")
+            clear_text = tr('clear', l) or tr('clear', 'en') or 'Clear'
+            self.clear_btn.config(text=clear_text)
+        if self.reset_btn is not None:
+            reset_text = tr('reset', l) or tr('reset', 'en') or 'Reset'
+            self.reset_btn.config(text=reset_text)
         if self.borderless_chk is not None:
             #self.borderless_chk.config(text=tr('borderless', l) or "")
             self.borderless_chk.config(text="")
@@ -523,7 +627,7 @@ class ModernApp:
         if self.framerate_label is not None:
             self.framerate_label.config(text=tr('framerate', l) or "Framerate:")
         if self.export_format_label is not None:
-            self.export_format_label.config(text=tr('export_format', l) or "Exportformat:", bg="#FFB3A7", fg="black", height=1)
+            self.export_format_label.config(text=tr('export_format', l) or "Exportformat:")
         if self.maxframes_label is not None:
             self.maxframes_label.config(text=tr('max_images', l) or "Max. Bilder:")
 

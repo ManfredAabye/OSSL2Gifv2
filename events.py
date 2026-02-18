@@ -6,14 +6,18 @@
 from tkinter import messagebox, colorchooser, ttk
 from PIL import Image
 from translations import tr
-from image_processing import show_gif_frame, update_previews
+from image_processing import show_gif_frame
+import threading
 
 def reset_settings(self):
 	self.width_var.set(2048)
 	self.height_var.set(2048)
 	self.bg_color = "#00000000"
 	self.bg_box_color = "#000000"
-	self.bg_color_box.config(bg=self.bg_box_color)
+	# Schachbrett-Pattern zurücksetzen (vollständig transparent)
+	from gui_layout import create_checkerboard_with_color
+	self.bg_color_photo = create_checkerboard_with_color(self.bg_box_color, alpha=0, size=32, checker_size=4)
+	self.bg_color_box.config(image=self.bg_color_photo)
 	self.borderless_var.set(0)
 	# Label und Tooltip für Randlos explizit zurücksetzen/übersetzen
 	if hasattr(self, 'borderless_label') and self.borderless_label is not None:
@@ -75,15 +79,42 @@ def on_maxframes_changed(self, *args):
 		update_previews(self)
 
 def choose_bg_color(self, event=None):
+	"""Öffnet einen Color-Chooser und erlaubt die Auswahl einer transparenten Hintergrundfarbe."""
+	from tkinter import simpledialog
 	color = colorchooser.askcolor(color=self.bg_box_color, title="Hintergrundfarbe wählen")
 	if color and color[1]:
 		self.bg_box_color = color[1]
-		if self.bg_box_color.lower() == "#000000":
-			self.bg_color = "#00000000"
+		# Frage nach Transparenz
+		transparency = simpledialog.askinteger(
+			"Transparenz",
+			"Transparenz (0=vollständig transparent, 255=undurchsichtig):",
+			initialvalue=255,
+			minvalue=0,
+			maxvalue=255
+		)
+		if transparency is not None:
+			# Konvertiere RGB zu RGBA mit Alpha-Wert
+			alpha_hex = format(transparency, '02x')
+			self.bg_color = self.bg_box_color + alpha_hex
 		else:
-			self.bg_color = self.bg_box_color
-		self.bg_color_box.config(bg=self.bg_box_color)
+			# Falls abgebrochen, verwende vollständig undurchsichtig
+			self.bg_color = self.bg_box_color + "ff"
+		# Update Schachbrett-Pattern mit neuer Farbe und Transparenz
+		from gui_layout import create_checkerboard_with_color
+		alpha_value = int(self.bg_color[7:9], 16) if len(self.bg_color) == 9 else 255
+		self.bg_color_photo = create_checkerboard_with_color(self.bg_box_color, alpha=alpha_value, size=32, checker_size=4)
+		self.bg_color_box.config(image=self.bg_color_photo)
 		update_previews(self)
+
+def set_transparent_bg(self):
+	"""Setzt die Hintergrundfarbe auf 100% transparent (Rechtsklick auf bg_color_box)."""
+	self.bg_color = "#00000000"
+	self.bg_box_color = "#000000"
+	# Update Schachbrett-Pattern mit vollständiger Transparenz
+	from gui_layout import create_checkerboard_with_color
+	self.bg_color_photo = create_checkerboard_with_color(self.bg_box_color, alpha=0, size=32, checker_size=4)
+	self.bg_color_box.config(image=self.bg_color_photo)
+	update_previews(self)
 
 def add_selected_frame_to_texture(self):
 	import threading
@@ -130,3 +161,13 @@ def change_language(self, event=None):
 	self.lang = self.lang_var.get()
 	self.update_language()  # Tooltips und Labels übersetzen
 	update_previews(self)
+
+def update_previews(self):
+	"""Aktualisiert beide Vorschau-Canvas mit aktueller Hintergrundfarbe"""
+	from image_processing import show_gif_frame
+	if self.gif_frames:
+		show_gif_frame(self)
+	else:
+		# Falls kein GIF, nur Textur mit aktuellem Hintergrund anzeigen
+		if hasattr(self, 'show_texture'):
+			self.show_texture()

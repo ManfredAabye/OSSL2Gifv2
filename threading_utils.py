@@ -11,5 +11,8 @@ import logging
 # Logging-Konfiguration für Threads (optional, falls nicht global gesetzt)
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s][Thread] %(message)s')
 
-# Globale Queue für Thread-Kommunikation
+# Globale Queues für Thread-Kommunikation
 frame_queue = queue.Queue()
+gif_queue = queue.Queue()      # Für GIF-Frame-Verarbeitung
+texture_queue = queue.Queue()  # Für Texture-Sheet-Verarbeitung
+

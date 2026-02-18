@@ -11,7 +11,63 @@ from typing import Any
 from tkinter import filedialog, messagebox, ttk
 from PIL import Image
 from translations import tr
-from image_processing import update_previews, apply_effects
+from image_processing import apply_effects
+
+def import_frames_to_gif(self: Any) -> None:
+	from tkinter import filedialog
+	import zipfile
+	from PIL import Image
+	import tempfile
+	import shutil
+	from io import BytesIO
+	import glob
+	import os
+	# Dialog: ZIP oder Verzeichnis
+	filetypes = [("ZIP-Archiv", "*.zip"), ("Bilder-Ordner", "*")]
+	path = filedialog.askopenfilename(title="ZIP oder Verzeichnis wählen", filetypes=filetypes)
+	if not path:
+		return
+	tempdir = None
+	image_files = []
+	try:
+		if path.lower().endswith('.zip'):
+			tempdir = tempfile.mkdtemp()
+			with zipfile.ZipFile(path, 'r') as zipf:
+				zipf.extractall(tempdir)
+			# Alle Bilddateien im tempdir suchen
+			image_files = sorted(glob.glob(os.path.join(tempdir, '*')))
+		else:
+			# Verzeichnis: alle Bilddateien
+			image_files = sorted(glob.glob(os.path.join(os.path.dirname(path), '*')))
+		# Nur Bilddateien (PNG, JPG, BMP, GIF)
+		image_files = [f for f in image_files if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif'))]
+		if not image_files:
+			if hasattr(self, 'status') and self.status:
+				self.status.config(text=tr('status_no_images_found', self.lang) or "Keine Bilder gefunden.")
+			return
+		# Bilder laden
+		frames = [Image.open(f).convert('RGBA') for f in image_files]
+		# GIF speichern
+		save_path = filedialog.asksaveasfilename(defaultextension='.gif', filetypes=[('GIF', '*.gif')], title="GIF speichern")
+		if not save_path:
+			return
+		frames[0].save(save_path, save_all=True, append_images=frames[1:], loop=0, duration=100)
+		# GIF laden
+		self._load_gif_frames(save_path)
+		self._setup_frame_select()
+		self._reset_play_button()
+		self._update_status()
+		self._update_preview()
+		if hasattr(self, '_update_texture'):
+			self._update_texture()
+		if hasattr(self, 'status') and self.status:
+			self.status.config(text=tr('status_gif_created', self.lang) or "GIF aus Einzelbildern erstellt.")
+	except Exception as e:
+		from tkinter import messagebox
+		messagebox.showerror("Fehler", f"Fehler beim Importieren: {e}")
+	finally:
+		if tempdir:
+			shutil.rmtree(tempdir)
 
 def load_gif_compat(self: Any) -> None:
 	"""
@@ -70,6 +126,13 @@ def _load_gif_frames(self: Any, file: str) -> None:
 	except Exception as e:
 		messagebox.showerror("Fehler", f"Unbekannter Fehler beim Laden des GIFs: {e}")
 		return
+	finally:
+		# Schließe die GIF-Datei, um Ressourcen freizugeben (Frames sind bereits im Speicher kopiert)
+		if hasattr(self, 'gif_image') and self.gif_image is not None:
+			try:
+				self.gif_image.close()
+			except Exception:
+				pass
 	if not frames and hasattr(self, 'gif_image'):
 		try:
 			frames.append(self.gif_image.copy())
@@ -100,11 +163,21 @@ def _update_status(self: Any) -> None:
 	self.maxframes_var.set(self.frame_count)
 	self.status.config(text=f"{tr('frame_count', self.lang)}: {self.frame_count}")
 
+def update_previews(self: Any) -> None:
+	"""Updates the GIF and texture previews in the GUI."""
+	if hasattr(self, 'gif_frames') and self.gif_frames and self.current_frame < len(self.gif_frames):
+		frame = self.gif_frames[self.current_frame]
+		from PIL import ImageTk
+		photo = ImageTk.PhotoImage(frame.resize((self.gif_canvas.winfo_width() or 300, self.gif_canvas.winfo_height() or 300)))
+		self.gif_canvas.create_image(0, 0, image=photo, anchor='nw')
+		self.gif_canvas.image = photo
+
 def _update_preview(self: Any) -> None:
 	"""Aktualisiert die GIF-Vorschau in der GUI."""
+	from image_processing import show_gif_frame
 	if hasattr(self, 'root') and self.root is not None:
 		self.root.update_idletasks()
-		update_previews(self)
+		show_gif_frame(self)
 
 def delete_gif(self: Any) -> None:
 	"""
@@ -138,7 +211,8 @@ def save_gif(self: Any) -> None:
 		frames = [apply_effects(self, f.resize((self.width_var.get(), self.height_var.get())), "gif") for f in self.gif_frames]
 		duration = self.framerate_var.get()
 		frames[0].save(file, save_all=True, append_images=frames[1:], loop=0, duration=duration)
-		messagebox.showinfo("Info", "GIF gespeichert.")
+		if hasattr(self, 'status') and self.status:
+			self.status.config(text=tr('status_gif_saved', self.lang) or "GIF gespeichert.")
 	except FileNotFoundError:
 		messagebox.showerror("Fehler", f"Datei konnte nicht gespeichert werden: {file}")
 	except MemoryError:
@@ -147,15 +221,64 @@ def save_gif(self: Any) -> None:
 		messagebox.showerror("Fehler", f"Fehler beim Speichern des GIFs: {e}")
 
 def save_texture(self: Any) -> None:
-	if self.texture_image is None:
-		messagebox.showerror("Fehler", "Keine Textur vorhanden.")
+	if not self.gif_frames:
+		messagebox.showerror("Fehler", "Keine Frames vorhanden.")
 		return
-	name = "texture"
-	if self.gif_image and hasattr(self.gif_image, 'filename'):
-		name = os.path.splitext(os.path.basename(self.gif_image.filename))[0]
+	
+	# Textur mit aktueller Hintergrundfarbe regenerieren (vor dem Speichern)
+	from PIL import ImageColor
+	tex_w = self.width_var.get() if self.width_var.get() > 0 else 2048
+	tex_h = self.height_var.get() if self.height_var.get() > 0 else 2048
+	
+	# Hintergrundfarbe parsen - unterstützt #RRGGBBAA Format
+	bg_color = getattr(self, 'bg_color', '#00000000')
+	bg_rgba: tuple[int, int, int, int] = (0, 0, 0, 0)  # Default: transparent
+	try:
+		if isinstance(bg_color, str) and len(bg_color) == 9 and bg_color.startswith('#'):
+			# Format: #RRGGBBAA
+			r = int(bg_color[1:3], 16)
+			g = int(bg_color[3:5], 16)
+			b = int(bg_color[5:7], 16)
+			a = int(bg_color[7:9], 16)
+			bg_rgba = (r, g, b, a)
+		elif isinstance(bg_color, str) and len(bg_color) == 7:
+			# Format: #RRGGBB (vollständig undurchsichtig)
+			color_result = ImageColor.getcolor(bg_color, "RGBA")
+			# Stelle sicher, dass wir ein 4er-Tupel haben
+			if isinstance(color_result, tuple) and len(color_result) >= 3:
+				bg_rgba = (int(color_result[0]), int(color_result[1]), int(color_result[2]), 255)
+		else:
+			bg_rgba = (0, 0, 0, 0)
+	except Exception:
+		bg_rgba = (0, 0, 0, 0)
+	
+	# Sheet mit aktueller Hintergrundfarbe erzeugen
 	frame_count = self.frame_count
 	tiles_x = math.ceil(math.sqrt(frame_count))
 	tiles_y = math.ceil(frame_count / tiles_x)
+	tile_w = tex_w // tiles_x
+	tile_h = tex_h // tiles_y
+	sheet = Image.new("RGBA", (tex_w, tex_h), bg_rgba)
+	
+	for idx, frame in enumerate(self.gif_frames):
+		tx = idx % tiles_x
+		ty = idx // tiles_x
+		f = frame.resize((tile_w, tile_h), Image.Resampling.LANCZOS)
+		f = apply_effects(self, f, prefix="texture")
+		x = tx * tile_w
+		y = ty * tile_h
+		sheet.paste(f, (x, y))
+	
+	# WICHTIG: Hintergrundfarbe in die Texture einbetten (nicht nur als Hintergrund)
+	# Wenn nicht vollständig transparent, composite gegen den Hintergrund
+	if bg_rgba[3] > 0:  # Nicht vollständig transparent
+		background = Image.new("RGBA", sheet.size, bg_rgba)
+		sheet = Image.alpha_composite(background, sheet)
+	
+	# Gespeicherte Textur für Datei-Dialog vorbereiten
+	name = "texture"
+	if self.gif_image and hasattr(self.gif_image, 'filename'):
+		name = os.path.splitext(os.path.basename(self.gif_image.filename))[0]
 	speed_val = self.framerate_var.get()
 	speed = f"{speed_val};0"
 	ext = self.export_format_var.get().lower()
@@ -165,14 +288,37 @@ def save_texture(self: Any) -> None:
 	if not file:
 		return
 	fmt = self.export_format_var.get().upper()
+	if fmt == "ZIP":
+		import zipfile
+		try:
+			with zipfile.ZipFile(file, 'w', zipfile.ZIP_DEFLATED) as zipf:
+				for idx, frame in enumerate(self.gif_frames):
+					img = apply_effects(self, frame.resize((self.width_var.get(), self.height_var.get())), "gif")
+					img_bytes = None
+					from io import BytesIO
+					img_bytes = BytesIO()
+					img.save(img_bytes, format="PNG")
+					img_bytes.seek(0)
+					zipf.writestr(f"frame_{idx+1:03d}.png", img_bytes.read())
+			if hasattr(self, 'status') and self.status:
+				self.status.config(text=tr('status_zip_saved', self.lang) or "GIF-Einzelbilder als ZIP gespeichert.")
+		except Exception as e:
+			messagebox.showerror("Fehler", f"Fehler beim ZIP-Export: {e}")
+		return
 	if fmt == "JPG":
 		fmt = "JPEG"
 	try:
-		img = self.texture_image
+		img = sheet
 		if fmt == "JPEG":
+			# Bei JPG: Immer zu RGB konvertieren (mit eingebetteter Hintergrundfarbe)
 			img = img.convert("RGB")
+		# Bei PNG: RGBA behalten (mit eingebetteter Hintergrundfarbe) oder zu RGB wenn nötig
+		elif fmt == "PNG":
+			if img.mode != "RGBA":
+				img = img.convert("RGBA")
 		img.save(file, format=fmt)
-		messagebox.showinfo("Info", "Textur gespeichert.")
+		if hasattr(self, 'status') and self.status:
+			self.status.config(text=tr('status_texture_saved', self.lang) or "Textur gespeichert.")
 	except FileNotFoundError:
 		messagebox.showerror("Fehler", f"Datei konnte nicht gespeichert werden: {file}")
 	except MemoryError:
@@ -198,7 +344,8 @@ def export_lsl(self: Any) -> None:
 	try:
 		with open(file, "w", encoding="utf-8") as f:
 			f.write(lsl)
-		messagebox.showinfo("Info", "LSL-Skript exportiert.")
+		if hasattr(self, 'status') and self.status:
+			self.status.config(text=tr('status_lsl_exported', self.lang) or "LSL-Skript exportiert.")
 	except Exception as e:
 		messagebox.showerror("Fehler", str(e))
 
