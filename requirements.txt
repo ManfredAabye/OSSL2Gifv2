@@ -1,4 +1,43 @@
-Pillow
-ttkbootstrap
-pyinstaller
-# Hinweis: tkinter ist Teil der Standardbibliothek und wird nicht über pip installiert.
+# ============================================================================
+# PyOSSL2Gif - Abhängigkeiten
+# ============================================================================
+# Zuletzt aktualisiert: 18. Februar 2026
+# Python Version: 3.13+
+#
+# WICHTIG: Um alle Pakete auf die neuesten Versionen zu aktualisieren:
+#   pip install --upgrade -r requirements.txt
+#
+# Um nur ein bestimmtes Paket zu aktualisieren:
+#   pip install --upgrade Pillow
+# ============================================================================
+
+# Bildverarbeitung (erforderlich)
+# --------------------------------
+Pillow==12.1.1
+# Changelog 11.3.0 → 12.1.1:
+#   - Verbesserte Performance bei RGBA-Operationen
+#   - Neue Filter und Optimierungen
+#   - Bugfixes für alpha_composite
+#   - Python 3.13 vollständig unterstützt
+
+# GUI-Framework (erforderlich für modernes Theme)
+# -----------------------------------------------
+ttkbootstrap==1.20.1
+# Moderne Themes für Tkinter-Oberfläche
+# Optional, aber empfohlen für bessere UX
+
+# Build-Tool (optional, nur für .exe-Erstellung)
+# -----------------------------------------------
+pyinstaller==6.19.0
+# Changelog 6.16.0 → 6.19.0:
+#   - Verbesserte Python 3.13 Unterstützung
+#   - Kleinere Executable-Größen
+#   - Bugfixes für Windows 11
+
+# ============================================================================
+# Standard-Bibliotheken (nicht über pip installiert):
+# ============================================================================
+# - tkinter (GUI - Teil von Python)
+# - threading (Multithreading)
+# - json (Konfiguration)
+# - math (Berechnungen)
