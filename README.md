@@ -191,7 +191,7 @@ Diese Effekte werden auf die finale Textur angewendet:
 3. **Transparenz-Schieberegler** direkt unter dem Farbfeld
     - 0% = vollständig transparent, 100% = undurchsichtig
 4. **Rechtsklick** auf das Farbfeld → Setzt sofort 100% Transparenz
-4. Die Vorschau zeigt ein Schachbrettmuster für Transparenzbereiche
+5. Die Vorschau zeigt ein Schachbrettmuster für Transparenzbereiche
 
 ![Screenshot: Hintergrundfarbe](docs/screenshots/05_hintergrundfarbe.png)
 
@@ -369,13 +369,33 @@ PyOSSL2Gif/
 ├── image_processing.py   # Bildverarbeitung und Threading
 ├── file_ops.py           # Datei-I/O (Laden, Speichern, Export)
 ├── events.py             # Event-Handler für Benutzeraktionen
+├── error_handler.py      # Zentrale Fehlerbehandlung und Safe-Execution
+├── config_manager.py     # Validierte Konfiguration und Defaults
+├── service_locator.py    # Service Registry / Dependency Injection
+├── app_bootstrap.py      # Service-Initialisierung und Shutdown
+├── app_types.py          # Typdefinitionen und Protocols
+├── worker_pool.py        # ThreadPool-Wrapper fuer Hintergrundjobs
+├── event_bus.py          # Pub/Sub Event-Bus fuer lose Kopplung
+├── config_panel.py       # GUI-Dialog fuer Konfiguration
+├── logging_dashboard.py  # Live-Log-Viewer in der GUI
 ├── translations.py       # Mehrsprachigkeits-Unterstützung
 ├── tooltip.py            # ToolTip-Klasse für Hilfe-Tooltips
 ├── threading_utils.py    # Queue-Management für Threading
 ├── config.py             # Konfigurationsverwaltung
 ├── config.json           # Gespeicherte Einstellungen
+├── mypy.ini              # Type-Checking Konfiguration
 └── requirements.txt      # Python-Abhängigkeiten
 ```
+
+### Neue Systemkomponenten (ab 2.0.10)
+
+- **Service-Initialisierung:** `app_bootstrap.py` registriert Services und schliesst sie sauber beim Beenden.
+- **Event Bus:** `event_bus.py` entkoppelt GUI, Processing und IO ueber Events.
+- **Worker Pool:** `worker_pool.py` sammelt Hintergrundjobs in einem ThreadPool.
+- **Zentrale Konfiguration:** `config_manager.py` validiert Settings und stellt Defaults bereit.
+- **Fehlerbehandlung:** `error_handler.py` sorgt fuer konsistente Logs und sichere Calls.
+- **GUI Tools:** `config_panel.py` fuer Einstellungen, `logging_dashboard.py` fuer Live-Logs.
+- **Typisierung:** `app_types.py` + `mypy.ini` sichern Typen und Pylance-Checks ab.
 
 ### Haupt-Module im Detail
 
@@ -623,6 +643,138 @@ def some_action(self):
     
     threading.Thread(target=do_work, daemon=True).start()
 ```
+
+---
+
+#### `app_bootstrap.py` – Service-Initialisierung
+
+**Zweck:** Startet und stoppt alle zentralen Services
+
+**Wichtige Funktionen:**
+
+- `bootstrap_services()`: Registriert Config, EventBus, WorkerPool und Logging
+- `shutdown_services()`: Sauberes Beenden von Hintergrunddiensten
+
+**Typischer Ablauf:**
+
+```python
+def bootstrap_services():
+    # Config laden
+    # EventBus starten
+    # WorkerPool starten
+    # Logging registrieren
+```
+
+---
+
+#### `service_locator.py` – Service Registry
+
+**Zweck:** Zentraler Zugriff auf Singletons ohne harte Imports
+
+**Wichtige Klasse:** `ServiceRegistry`
+
+- `register(name, instance)`: Service registrieren
+- `get(name)`: Service abrufen
+- `unregister(name)`: Service entfernen
+
+**Beispiel:**
+
+```python
+registry.register("event_bus", EventBus())
+bus = registry.get("event_bus")
+```
+
+---
+
+#### `config_manager.py` – Validierte Konfiguration
+
+**Zweck:** Einheitliche Defaults, Validierung und Zugriff auf Settings
+
+**Wichtige Punkte:**
+
+- Schema-Validierung mit Default-Werten
+- Typsichere Getter fuer Settings
+- Zentraler Zugriff statt verteilten Magic Numbers
+
+---
+
+#### `worker_pool.py` – ThreadPool-Wrapper
+
+**Zweck:** Hintergrundarbeit zentral und kontrolliert ausfuehren
+
+**Wichtige Funktionen:**
+
+- `submit(task_name, fn, *args)`: Task einreihen
+- `wait_all()`: Alle Tasks abwarten
+- `shutdown()`: ThreadPool sauber beenden
+
+---
+
+#### `event_bus.py` – Pub/Sub Event-Bus
+
+**Zweck:** Lose Kopplung zwischen GUI, Processing und IO
+
+**Konzepte:**
+
+- `EventType` Enum fuer standardisierte Events
+- `subscribe(event_type, handler)`
+- `publish(event_type, payload)`
+- Event-History fuer Debugging
+
+---
+
+#### `error_handler.py` – Fehlerbehandlung
+
+**Zweck:** Einheitliche Fehlerlogs und sichere Ausfuehrung
+
+**Wichtige Funktionen:**
+
+- `safe_execute(fn, *args)`: Fehler abfangen und loggen
+- `handle_exception(logger)`: Decorator fuer Event-Handler
+- `close_resource(resource)`: Sicheres Schliessen von Handles
+
+---
+
+#### `config_panel.py` – GUI fuer Einstellungen
+
+**Zweck:** Zentrale Einstellungsdialoge mit Validierung
+
+**Funktionen:**
+
+- Gruppierte Settings (Bild, Performance, UI, Export)
+- Speichern, Zuruecksetzen, Live-Preview
+
+---
+
+#### `logging_dashboard.py` – Live-Log-Viewer
+
+**Zweck:** Logs direkt in der GUI anzeigen und filtern
+
+**Funktionen:**
+
+- Live-Stream der Log-Eintraege
+- Level-Filter und Suchfeld
+- Farbige Hervorhebung nach Severity
+
+---
+
+#### `app_types.py` – Typdefinitionen
+
+**Zweck:** Gemeinsame Typen fuer Pylance und mypy
+
+**Beispiele:**
+
+- `RGBAColor`, `EffectConfig`
+- `ModernAppProtocol` fuer Schnittstellen
+
+---
+
+#### `mypy.ini` – Type Checking
+
+**Zweck:** Einheitliche Typpruefung fuer Kernmodule
+
+- Strikter Modus fuer zentrale Dateien
+- Lockerer Modus fuer GUI-Glue-Code
 
 ---
 
