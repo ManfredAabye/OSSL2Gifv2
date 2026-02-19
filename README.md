@@ -1,17 +1,20 @@
 
-# OSSL2Gif – GIF zu Textur Konverter (Version 2.0.8)
+# OSSL2Gif – GIF zu Textur Konverter (Version 2.0.10)
 
-Mit OSSL2Gif 2.0.8 wandelst du animierte GIFs komfortabel in Texturen für Second Life/OpenSim um – jetzt mit vielen neuen Features und moderner Oberfläche!
+Mit OSSL2Gif 2.0.10 wandelst du animierte GIFs komfortabel in Texturen für Second Life/OpenSim um – jetzt mit vielen neuen Features und moderner Oberfläche!
 
-## Was ist neu in 2.0.8?
+## Was ist neu in 2.0.10?
 
 - **Einzelne Bilder entfernen:** Über den neuen "Entfernen"-Button kannst du gezielt einzelne Frames aus der GIF-Liste löschen.
 - **Max. Bilder:** Die maximale Bildanzahl ist einstellbar. Überschüssige Bilder werden automatisch entfernt.
 - **Threading:** Hinzufügen und Entfernen von Frames läuft im Hintergrund – die Oberfläche bleibt immer reaktionsschnell.
+- **Borderless-Optimierung:** Randlose Texturen werden robuster und ohne leere Pixel erzeugt.
 - **Mehrsprachigkeit:** Die Oberfläche ist in vielen Sprachen verfügbar (Deutsch, Englisch, Französisch, Spanisch, Italienisch, Russisch, Niederländisch, Schwedisch, Polnisch, Portugiesisch).
 - **Modernes UI:** Optional mit `ttkbootstrap` für ein frisches, anpassbares Design.
 - **Fehlerbehebungen:** Viele Bugs und UX-Probleme wurden beseitigt.
 - **Konfigurationsspeicherung:** Alle Einstellungen werden automatisch gespeichert und beim nächsten Start wiederhergestellt.
+- **Hintergrund-Transparenz direkt in der GUI:** Transparenz-Schieberegler ist jetzt im Hauptfenster integriert (kein separates Dialogfenster mehr).
+- **Stabilität & Fehlerbehandlung:** Robustere Abläufe bei langen GIFs und Hintergrund-Tasks.
 
 ## Unterstützte Betriebssysteme
 
@@ -29,7 +32,8 @@ OSSL2Gif ist plattformübergreifend und läuft überall dort, wo Python 3.13 und
 - **pip** (meist mit Python installiert)
 - **tkinter** (bei Python fast immer schon dabei)
 - **Pillow** (für die Bildverarbeitung)
-- **ttkbootstrap** (für ein modernes Aussehen)
+- **numpy** (für Filter und Bildoperationen)
+- **Optional:** Für ein modernes Aussehen `ttkbootstrap`
 
 ## Installation – Schritt für Schritt
 
@@ -63,21 +67,25 @@ OSSL2Gif ist plattformübergreifend und läuft überall dort, wo Python 3.13 und
 Um von Bugfixes und neuen Features zu profitieren, sollten die Abhängigkeiten regelmäßig aktualisiert werden:
 
 1. **Alle Pakete auf neueste Versionen aktualisieren:**
+
    ```bash
    pip install --upgrade -r requirements.txt
    ```
 
 2. **Nur ein bestimmtes Paket aktualisieren:**
+
    ```bash
    pip install --upgrade Pillow
    ```
 
 3. **Installierte Versionen prüfen:**
+
    ```bash
    pip list
    ```
 
 4. **Nach veralteten Paketen suchen:**
+
    ```bash
    pip list --outdated
    ```
@@ -98,6 +106,7 @@ Nach größeren Updates solltest du die Anwendung testen:
 4. LSL-Export prüfen
 
 Bei Problemen kannst du auf eine vorherige Version zurück:
+
 ```bash
 pip install Pillow==11.3.0
 ```
@@ -178,9 +187,10 @@ Diese Effekte werden auf die finale Textur angewendet:
 
 1. Im Bereich "Textur-Einstellungen" findest du das **"Hintergrundfarbe"**-Feld
 2. **Linksklick** auf das Farbfeld → Farbauswahl-Dialog öffnet sich
-   - Wähle eine Farbe
-   - Stelle die Transparenz ein (0 = vollständig transparent, 255 = undurchsichtig)
-3. **Rechtsklick** auf das Farbfeld → Setzt sofort 100% Transparenz
+    - Wähle eine Farbe
+3. **Transparenz-Schieberegler** direkt unter dem Farbfeld
+    - 0% = vollständig transparent, 100% = undurchsichtig
+4. **Rechtsklick** auf das Farbfeld → Setzt sofort 100% Transparenz
 4. Die Vorschau zeigt ein Schachbrettmuster für Transparenzbereiche
 
 ![Screenshot: Hintergrundfarbe](docs/screenshots/05_hintergrundfarbe.png)
@@ -227,6 +237,13 @@ Diese Effekte werden auf die finale Textur angewendet:
 - Wähle die Größe passend zu deinen Upload-Rechten
 
 ![Screenshot: Größen-Einstellung](docs/screenshots/07_groesse.png)
+
+### Schritt 8: Borderless-Modus (optional)
+
+- Aktiviere **"Randlos"** (Checkbox)
+- Entfernt automatisch leere transparente Ränder
+- Die Textur wird auf die minimal benötigte Größe zugeschnitten
+- Nützlich für maximale Effizienz
 
 ### Schritt 9: Textur speichern
 
@@ -651,14 +668,14 @@ def tr(key, lang='de'):
 
 ```json
 {
+  "theme": "darkly",
   "lang": "de",
-  "width": 2048,
-  "height": 2048,
+  "texture_width": 2048,
+  "texture_height": 2048,
   "bg_color": "#00000000",
-  "framerate": 10,
   "export_format": "PNG",
-  "maxframes": 196,
-  "theme": "superhero"
+  "borderless": false,
+  "max_frames": 64
 }
 ```
 
@@ -760,18 +777,7 @@ python -m pytest test_*.py
 
 ## Changelog (Auszug)
 
-- Version 2.0.3: Einzelbild-Entfernung, max. Bilder, Threading, Borderless-Verbesserung, modernes UI, Bugfixes
-Version 2.0.4: Logging-System hinzugefügt.
-
-- Version 2.0.5: Type Hints zu den wichtigsten Funktionen hinzugefügt.
-
-- Version 2.0.6: Custom Exceptions - sehr hilfreich für bessere Fehlerbehandlung hinzugefügt.
-
-
-- Version 2.0.7: Randlos funktioniert nicht immer. Es sollte den Rand auf der Rechten Seite und den Unteren Rand die Transparent oder Einfarbig sein können entfernen indem die Textur entsprechende Pixel nach Rechts und unten über den Rand hinaus Skaliert so das sie nach dem speichern Eliminiert sind.
-
-- Version 2.0.8: Randlos ist jetzt anders gelöst und alle borderless Funktionen wurden entfernt.
+- 2.0.3: Einzelbild-Entfernung, max. Bilder, Threading, Borderless-Verbesserung, modernes UI, Bugfixes
+- 1.x: Grundfunktionen (GIF laden, speichern, Effekte, Export)
 
 ---
-
-
