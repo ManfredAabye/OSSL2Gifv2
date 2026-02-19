@@ -21,6 +21,59 @@ from event_bus import get_event_bus, EventType
 
 logger = get_logger(__name__)
 
+def calculate_optimal_grid(frame_count: int) -> tuple[int, int]:
+	"""
+	Berechnet optimale Raster-Aufteilung für Frames.
+	Bevorzugt Layouts ohne Verschwendung (leere Zellen) und möglichst quadratische Form.
+	
+	Beispiele:
+	- 10 Frames: 5x2 (besser als 4x3 mit 2 leeren Zellen)
+	- 16 Frames: 4x4 (perfekt quadratisch)
+	- 15 Frames: 5x3 (besser als 4x4 mit 1 leerer Zelle)
+	
+	Returns:
+		(tiles_x, tiles_y) - Anzahl Spalten und Zeilen
+	"""
+	if frame_count <= 0:
+		return (1, 1)
+	if frame_count == 1:
+		return (1, 1)
+	
+	# Finde beste Faktorisierung
+	best_x, best_y = 1, frame_count
+	best_waste = frame_count - 1  # Maximal mögliche Verschwendung
+	best_ratio = float('inf')
+	
+	# Prüfe alle möglichen Aufteilungen bis sqrt(frame_count)
+	# Wir müssen nur bis sqrt prüfen, da darüber hinaus die Faktoren sich wiederholen
+	max_check = int(math.sqrt(frame_count * 2)) + 1  # Etwas Puffer für nicht-perfekte Quadrate
+	
+	for x in range(1, max_check + 1):
+		y = math.ceil(frame_count / x)
+		total_cells = x * y
+		waste = total_cells - frame_count
+		ratio = max(x, y) / min(x, y)  # Seitenverhältnis (>=1)
+		
+		# Entscheidungskriterien (Priorität absteigend):
+		# 1. Minimiere Verschwendung (leere Zellen)
+		# 2. Bei gleicher Verschwendung: bevorzuge quadratischere Form
+		is_better = False
+		if waste < best_waste:
+			is_better = True
+		elif waste == best_waste and ratio < best_ratio:
+			is_better = True
+		
+		if is_better:
+			best_x, best_y = x, y
+			best_waste = waste
+			best_ratio = ratio
+	
+	# Stelle sicher, dass tiles_x >= tiles_y (mehr Spalten als Zeilen)
+	if best_x < best_y:
+		best_x, best_y = best_y, best_x
+	
+	return (best_x, best_y)
+
 def create_smart_scaled_texture(self: ModernAppProtocol, target_w: int, target_h: int, bg_rgba: RGBAColor, preview_mode: bool = True) -> Image.Image:
 	"""
 	Erstellt eine Texture mit intelligenter Skalierung:
@@ -40,8 +93,7 @@ def create_smart_scaled_texture(self: ModernAppProtocol, target_w: int, target_h
 	"""
 	try:
 		frame_count = self.frame_count
-		tiles_x = math.ceil(math.sqrt(frame_count))
-		tiles_y = math.ceil(frame_count / tiles_x)
+		tiles_x, tiles_y = calculate_optimal_grid(frame_count)
 		
 		# Ermittle durchschnittliche Frame-Größe
 		if self.gif_frames:

@@ -225,11 +225,11 @@ def build_layout(self):
 	self.tooltips['texture_settings'] = ToolTip(self.texture_settings, tr('tt_texture_settings', self.lang))
 
 	# --- Master Einstellungen ---
-	self.master_group = ttk.LabelFrame(main, text=tr('master_settings', self.lang) or "Master Einstellungen")
+	self.master_group = ttk.LabelFrame(main, text=f"🛠 {tr('master_settings', self.lang) or 'Master Einstellungen'}")
 	self.master_group.pack(fill=tk.X, padx=10, pady=(12,2))
 
 	# --- Media ---
-	self.media_group = ttk.LabelFrame(main, text=tr('media', self.lang) or "Media")
+	self.media_group = ttk.LabelFrame(main, text=f"🎬 {tr('media', self.lang) or 'Media'}")
 	self.media_group.pack(fill=tk.X, padx=10, pady=(12,2))
 
 	# --- Datei-Gruppe ---
@@ -244,33 +244,34 @@ def build_layout(self):
 	except ImportError:
 		tb = None
 		THEME_AVAILABLE = False
+	load_text = f"📂 {tr('load_gif', self.lang) or 'GIF laden'}"
 	if THEME_AVAILABLE and tb is not None:
-		self.load_btn = tb.Button(self.file_group, text=tr('load_gif', self.lang) or "GIF laden", command=self.load_gif, bootstyle="success")
+		self.load_btn = tb.Button(self.file_group, text=load_text, command=self.load_gif, bootstyle="success")
 	else:
-		self.load_btn = tk.Button(self.file_group, text=tr('load_gif', self.lang) or "GIF laden", command=self.load_gif, bg="#4CAF50", fg="white", activebackground="#388E3C", activeforeground="white")
+		self.load_btn = tk.Button(self.file_group, text=load_text, command=self.load_gif, bg="#4CAF50", fg="white", activebackground="#388E3C", activeforeground="white")
 	self.load_btn.pack(side=tk.LEFT, padx=2, pady=2)
 	self.tooltips['load_btn'] = ToolTip(self.load_btn, tr('tt_load_btn', self.lang))
-	self.save_gif_btn = ttk.Button(self.file_group, text=tr('save_gif', self.lang) or "GIF speichern", command=self.save_gif)
+	self.save_gif_btn = ttk.Button(self.file_group, text=f"💾 {tr('save_gif', self.lang) or 'GIF speichern'}", command=self.save_gif)
 	self.save_gif_btn.pack(side=tk.LEFT, padx=2, pady=2)
 	self.tooltips['save_gif_btn'] = ToolTip(self.save_gif_btn, tr('tt_save_gif_btn', self.lang))
-	self.save_texture_btn = ttk.Button(self.file_group, text=tr('save_texture', self.lang) or "Textur speichern", command=self.save_texture)
+	self.save_texture_btn = ttk.Button(self.file_group, text=f"🧵 {tr('save_texture', self.lang) or 'Textur speichern'}", command=self.save_texture)
 	self.save_texture_btn.pack(side=tk.LEFT, padx=2, pady=2)
 	self.tooltips['save_texture_btn'] = ToolTip(self.save_texture_btn, tr('tt_save_texture_btn', self.lang))
-	self.export_lsl_btn = ttk.Button(self.file_group, text=tr('export_lsl', self.lang) or "LSL exportieren", command=self.export_lsl)
+	self.export_lsl_btn = ttk.Button(self.file_group, text=f"🧾 {tr('export_lsl', self.lang) or 'LSL exportieren'}", command=self.export_lsl)
 	self.export_lsl_btn.pack(side=tk.LEFT, padx=2, pady=2)
 	self.tooltips['export_lsl_btn'] = ToolTip(self.export_lsl_btn, tr('tt_export_lsl_btn', self.lang))
 
 	# Button: Einzelbilder (ZIP/Ordner) zu GIF
-	self.import_frames_btn = ttk.Button(self.file_group, text=tr('import_frames', self.lang) or "Bilder zu GIF", command=self.import_frames_to_gif)
+	self.import_frames_btn = ttk.Button(self.file_group, text=f"🧩 {tr('import_frames', self.lang) or 'Bilder zu GIF'}", command=self.import_frames_to_gif)
 	self.import_frames_btn.pack(side=tk.LEFT, padx=2, pady=2)
 	self.tooltips['import_frames_btn'] = ToolTip(self.import_frames_btn, tr('tt_import_frames_btn', self.lang))
 	# Clear Button
 	if THEME_AVAILABLE and tb is not None:
 		style = tb.Style()
 		style.configure("RedClear.TButton", background="#e53935", foreground="white")
-		self.clear_btn = tb.Button(self.file_group, text=tr('clear', self.lang) or "", command=self.clear_texture, style="RedClear.TButton")
+		self.clear_btn = tb.Button(self.file_group, text=f"🧹 {tr('clear', self.lang) or ''}", command=self.clear_texture, style="RedClear.TButton")
 	else:
-		self.clear_btn = tk.Button(self.file_group, text=tr('clear', self.lang) or "", command=self.clear_texture, bg="#e53935", fg="white", activebackground="#b71c1c", activeforeground="white")
+		self.clear_btn = tk.Button(self.file_group, text=f"🧹 {tr('clear', self.lang) or ''}", command=self.clear_texture, bg="#e53935", fg="white", activebackground="#b71c1c", activeforeground="white")
 	self.clear_btn.pack(side=tk.LEFT, padx=2, pady=2)
 	self.tooltips['clear_btn'] = ToolTip(self.clear_btn, tr('tt_clear_btn', self.lang))
 	# --- Media Controls ---
@@ -281,7 +282,7 @@ def build_layout(self):
 	# Geschwindigkeit/Abspielrate-Slider für Media Play
 	playrate_row = ttk.Frame(self.media_group)
 	playrate_row.pack(fill=tk.X, pady=(4,2))
-	self.media_playrate_label = ttk.Label(playrate_row, text=tr('playrate', self.lang) or "Abspielrate:", width=12, anchor="w")
+	self.media_playrate_label = ttk.Label(playrate_row, text=f"🎚 {tr('playrate', self.lang) or 'Abspielrate:'}", width=12, anchor="w")
 	self.media_playrate_label.pack(side=tk.LEFT, padx=(0,4))
 	self.tooltips['media_playrate_label'] = ToolTip(self.media_playrate_label, tr('tt_media_playrate_label', self.lang))
 	self.media_playrate_var = tk.IntVar(value=100)
@@ -326,7 +327,7 @@ def build_layout(self):
 	# Bildgröße
 	size_row = ttk.Frame(left_frame)
 	size_row.pack(fill=tk.X, pady=(4,2))
-	self.size_label = ttk.Label(size_row, text="Bildgröße:", background="#e0f7fa", foreground="black", relief=tk.FLAT, borderwidth=1, width=12, anchor="w", font=("Segoe UI", 10))
+	self.size_label = ttk.Label(size_row, text=f"📐 {tr('image_size', self.lang) or 'Bildgröße:'}", background="#e0f7fa", foreground="black", relief=tk.FLAT, borderwidth=1, width=12, anchor="w", font=GUI_FONT)
 	self.size_label.pack(side=tk.LEFT, padx=(0,4), ipady=6)
 	self.tooltips['size_label'] = ToolTip(self.size_label, tr('tt_size_label', self.lang))
 	self.width_var = tk.IntVar(value=self.image_width)
@@ -369,7 +370,7 @@ def build_layout(self):
 	# Bildrate
 	framerate_row = ttk.Frame(left_frame)
 	framerate_row.pack(fill=tk.X, pady=(4,2))
-	self.framerate_label = ttk.Label(framerate_row, text=tr('framerate', self.lang) or "Framerate:", background="#bbdefb", foreground="black", relief=tk.FLAT, borderwidth=1, width=12, anchor="w", font=("Segoe UI", 10))
+	self.framerate_label = ttk.Label(framerate_row, text=f"⏱ {tr('framerate', self.lang) or 'Framerate:'}", background="#bbdefb", foreground="black", relief=tk.FLAT, borderwidth=1, width=12, anchor="w", font=GUI_FONT)
 	self.framerate_label.pack(side=tk.LEFT, padx=(0,4), ipady=6)
 	self.tooltips['framerate_label'] = ToolTip(self.framerate_label, tr('tt_framerate_label', self.lang))
 	self.framerate_var = tk.IntVar(value=10)
@@ -379,7 +380,7 @@ def build_layout(self):
 	# Max. Bilder
 	maxframes_row = ttk.Frame(left_frame)
 	maxframes_row.pack(fill=tk.X, pady=(4,2))
-	self.maxframes_label = ttk.Label(maxframes_row, text=tr('max_images', self.lang) or "Max. Bilder:", background="#c8e6c9", foreground="black", relief=tk.FLAT, borderwidth=1, width=12, anchor="w", font=("Segoe UI", 10))
+	self.maxframes_label = ttk.Label(maxframes_row, text=f"🖼 {tr('max_images', self.lang) or 'Max. Bilder:'}", background="#c8e6c9", foreground="black", relief=tk.FLAT, borderwidth=1, width=12, anchor="w", font=GUI_FONT)
 	self.maxframes_label.pack(side=tk.LEFT, padx=(0,4), ipady=6)
 	self.tooltips['maxframes_label'] = ToolTip(self.maxframes_label, tr('tt_maxframes_label', self.lang))
 	self.maxframes_var = tk.IntVar(value=64)
@@ -397,7 +398,7 @@ def build_layout(self):
 	# Hintergrundfarbe
 	bg_row = ttk.Frame(middle_frame)
 	bg_row.pack(fill=tk.X, pady=(4,2))
-	self.bg_label = ttk.Label(bg_row, text=tr('bg_color', self.lang) or "Hintergrundfarbe:", background="#fff9c4", foreground="black", relief=tk.FLAT, borderwidth=1, width=16, anchor="w", font=("Segoe UI", 10))
+	self.bg_label = ttk.Label(bg_row, text=f"🎨 {tr('bg_color', self.lang) or 'Hintergrundfarbe:'}", background="#fff9c4", foreground="black", relief=tk.FLAT, borderwidth=1, width=16, anchor="w", font=GUI_FONT)
 	self.bg_label.pack(side=tk.LEFT, padx=(0,4), ipady=6)
 	self.tooltips['bg_label'] = ToolTip(self.bg_label, tr('tt_bg_label', self.lang))
 	self.bg_color = "#00000000"
@@ -412,7 +413,17 @@ def build_layout(self):
 	# Transparenz-Schieberegler für Hintergrundfarbe
 	transparency_bg_row = ttk.Frame(middle_frame)
 	transparency_bg_row.pack(fill=tk.X, pady=(2,4))
-	self.transparency_bg_label = ttk.Label(transparency_bg_row, text="Transparenz:", background="#fff9c4", foreground="black", relief=tk.FLAT, borderwidth=1, width=16, anchor="w", font=("Segoe UI", 9))
+	self.transparency_bg_label = ttk.Label(
+		transparency_bg_row,
+		text=f"💧 {tr('bg_transparency', self.lang) or 'Transparenz:'}",
+		background="#fff9c4",
+		foreground="black",
+		relief=tk.FLAT,
+		borderwidth=1,
+		width=16,
+		anchor="w",
+		font=GUI_FONT
+	)
 	self.transparency_bg_label.pack(side=tk.LEFT, padx=(0,4), ipady=3)
 	
 	# Schieberegler (0-255, wobei 255 = vollständig sichtbar)
@@ -421,9 +432,12 @@ def build_layout(self):
 	self.transparency_bg_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
 	
 	# Prozent-Label
-	self.transparency_bg_percent = ttk.Label(transparency_bg_row, text="100%", width=4, font=("Segoe UI", 9, "bold"))
+	self.transparency_bg_percent = ttk.Label(transparency_bg_row, text="100%", width=4, font=GUI_FONT)
 	self.transparency_bg_percent.pack(side=tk.LEFT)
-	self.tooltips['transparency_bg_scale'] = ToolTip(self.transparency_bg_scale, "Transparenz der Hintergrundfarbe einstellen")
+	self.tooltips['transparency_bg_scale'] = ToolTip(
+		self.transparency_bg_scale,
+		tr('tt_bg_transparency', self.lang) or "Transparenz der Hintergrundfarbe einstellen"
+	)
 	
 	# Bild hinzufügen
 	add_row = ttk.Frame(middle_frame)
@@ -432,15 +446,15 @@ def build_layout(self):
 	self.frame_select_spin = ttk.Spinbox(add_row, from_=0, to=0, textvariable=self.frame_select_var, width=5, state="readonly")
 	self.frame_select_spin.pack(side=tk.RIGHT)
 	self.tooltips['frame_select_spin'] = ToolTip(self.frame_select_spin, tr('tt_frame_select_spin', self.lang))
-	self.add_frame_btn = ttk.Button(add_row, text=tr('add_frame', self.lang) or "")
+	self.add_frame_btn = ttk.Button(add_row, text=f"➕ {tr('add_frame', self.lang) or ''}")
 	self.add_frame_btn.pack(side=tk.RIGHT, padx=(0,4))
 	self.tooltips['add_frame_btn'] = ToolTip(self.add_frame_btn, tr('tt_add_frame_btn', self.lang))
 	# Entfernen-Button für Frames
 	# Korrektur: style-Parameter nur setzen, wenn Stilname existiert
 	if 'RedClear.TButton' in ttk.Style().theme_names():
-		self.remove_frame_btn = ttk.Button(add_row, text="Entfernen", style="RedClear.TButton")
+		self.remove_frame_btn = ttk.Button(add_row, text="➖ Entfernen", style="RedClear.TButton")
 	else:
-		self.remove_frame_btn = ttk.Button(add_row, text="Entfernen")
+		self.remove_frame_btn = ttk.Button(add_row, text="➖ Entfernen")
 	self.remove_frame_btn.pack(side=tk.RIGHT, padx=(0,4))
 	self.tooltips['remove_frame_btn'] = ToolTip(self.remove_frame_btn, "Bild entfernen")
 
@@ -452,7 +466,7 @@ def build_layout(self):
 	lang_row.pack(fill=tk.X, pady=(4,2))
 	self.lang_label = ttk.Label(
 		lang_row,
-		text=tr('language', self.lang) or "",
+		text=f"🌐 {tr('language', self.lang) or ''}",
 		background="#eeec7d",
 		foreground=GUI_LABEL_FG,
 		relief=tk.FLAT,
@@ -464,7 +478,7 @@ def build_layout(self):
 	self.lang_label.pack(side=tk.LEFT, padx=(0,4), ipady=6)
 	self.tooltips['lang_label'] = ToolTip(self.lang_label, tr('tt_lang_label', self.lang))
 	self.lang_var = tk.StringVar(value=self.lang)
-	self.lang_combo = ttk.Combobox(lang_row, values=['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt'], textvariable=self.lang_var, width=6, state="readonly", font=GUI_FONT)
+	self.lang_combo = ttk.Combobox(lang_row, values=['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt', 'uk', 'ja', 'zh'], textvariable=self.lang_var, width=6, state="readonly", font=GUI_FONT)
 	self.lang_combo.pack(side=tk.LEFT)
 	self.tooltips['lang_combo'] = ToolTip(self.lang_combo, tr('tt_lang_combo', self.lang))
 	# Bindings werden in main.py gesetzt
@@ -473,7 +487,7 @@ def build_layout(self):
 	if THEME_AVAILABLE and tb is not None:
 		theme_row = ttk.Frame(right_frame)
 		theme_row.pack(fill=tk.X, pady=(4,2))
-		theme_label = ttk.Label(theme_row, text=tr('theme', self.lang) or "Theme:", background="#e0e0e0", foreground="black", relief=tk.FLAT, borderwidth=1, width=GUI_LABEL_WIDTH, anchor="w", font=GUI_FONT)
+		theme_label = ttk.Label(theme_row, text=f"🎛 {tr('theme', self.lang) or 'Theme:'}", background="#e0e0e0", foreground="black", relief=tk.FLAT, borderwidth=1, width=GUI_LABEL_WIDTH, anchor="w", font=GUI_FONT)
 		theme_label.pack(side=tk.LEFT, padx=(0,4), ipady=6)
 		self.tooltips['theme_label'] = ToolTip(theme_label, tr('tt_theme_label', self.lang) or "Wähle das Farbschema für die Oberfläche.")
 		self.theme_label = theme_label
@@ -501,7 +515,7 @@ def build_layout(self):
 	export_format_row.pack(fill=tk.X, pady=(4,2))
 	self.export_format_label = ttk.Label(
 		export_format_row,
-		text=tr('export_format', self.lang) or "Exportformat:",
+		text=f"📤 {tr('export_format', self.lang) or 'Exportformat:'}",
 		background="#FFB3A7",
 		foreground=GUI_LABEL_FG,
 		relief=tk.FLAT,
@@ -524,9 +538,9 @@ def build_layout(self):
 	if THEME_AVAILABLE and tb is not None:
 		style = tb.Style()
 		style.configure("RedReset.TButton", background=GUI_WARN_BG, foreground=GUI_WARN_FG)
-		self.reset_btn = tb.Button(reset_row, text=tr('reset', self.lang) or "Reset", style="RedReset.TButton", width=GUI_WARN_WIDTH)
+		self.reset_btn = tb.Button(reset_row, text=f"🔄 {tr('reset', self.lang) or 'Reset'}", style="RedReset.TButton", width=GUI_WARN_WIDTH)
 	else:
-		self.reset_btn = tk.Button(reset_row, text=tr('reset', self.lang) or "Reset", bg=GUI_WARN_BG, fg=GUI_WARN_FG, activebackground="#b71c1c", activeforeground="white", width=GUI_WARN_WIDTH, height=GUI_WARN_HEIGHT, font=GUI_FONT)
+		self.reset_btn = tk.Button(reset_row, text=f"🔄 {tr('reset', self.lang) or 'Reset'}", bg=GUI_WARN_BG, fg=GUI_WARN_FG, activebackground="#b71c1c", activeforeground="white", width=GUI_WARN_WIDTH, height=GUI_WARN_HEIGHT, font=GUI_FONT)
 	self.reset_btn.pack(side=tk.LEFT, padx=8, ipady=6)
 	self.tooltips['reset_btn'] = ToolTip(self.reset_btn, tr('tt_reset_btn', self.lang))
 

@@ -53,7 +53,10 @@ try:
             0x413: 'nl',
             0x41d: 'se',
             0x415: 'pl',
-            0x816: 'pt'
+            0x816: 'pt',
+            0x422: 'uk',
+            0x411: 'ja',
+            0x804: 'zh'
             # Weitere Codes nach Bedarf ergänzen
         }
         return lang_map.get(lid, f'unknown({lid})')
@@ -74,8 +77,8 @@ except Exception as e:
     DEFAULT_KEYBOARD_LAYOUT = 'unknown'
     DEFAULT_LANGUAGE = 'unknown'
 
-LANGUAGES = ['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt']
-Version = "2.0.10"
+LANGUAGES = ['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt', 'uk', 'ja', 'zh']
+Version = "2.0.12"
 WindowsSize  = "1500x1550"
 
 class ModernApp:
@@ -482,7 +485,7 @@ class ModernApp:
         l = self.lang
         # Import Frames Button und Tooltip aktualisieren
         if hasattr(self, 'import_frames_btn') and self.import_frames_btn is not None:
-            self.import_frames_btn.config(text=tr('import_frames', l) or "Bilder zu GIF")
+            self.import_frames_btn.config(text=f"🧩 {tr('import_frames', l) or 'Bilder zu GIF'}")
         if 'import_frames_btn' in self.tooltips:
             self.tooltips['import_frames_btn'].set_text(tr('tt_import_frames_btn', l))
         # Tooltips dynamisch aktualisieren
@@ -503,6 +506,7 @@ class ModernApp:
             'height_entry': 'tt_height_entry',
             'bg_label': 'tt_bg_label',
             'bg_color_box': 'tt_bg_color_box',
+            'transparency_bg_scale': 'tt_bg_transparency',
             'framerate_label': 'tt_framerate_label',
             'framerate_spin': 'tt_framerate_spin',
             'lang_label': 'tt_lang_label',
@@ -527,13 +531,13 @@ class ModernApp:
                 self.tooltips[k].set_text(tr(v, l))
         # Media-Abspielrate-Label und Tooltip übersetzen
         if hasattr(self, 'media_playrate_label') and self.media_playrate_label is not None:
-            self.media_playrate_label.config(text=tr('playrate', l) or "Abspielrate:")
+            self.media_playrate_label.config(text=f"🎚 {tr('playrate', l) or 'Abspielrate:'}")
         if 'media_playrate_label' in self.tooltips:
             self.tooltips['media_playrate_label'].set_text(tr('tt_media_playrate_label', l))
         # Theme-Label und Combobox übersetzen (analog zu anderen Labels)
         if hasattr(self, 'theme_label') and self.theme_label is not None:
             theme_text = tr('theme', l) or tr('theme', 'en') or 'Theme:'
-            self.theme_label.config(text=theme_text)
+            self.theme_label.config(text=f"🎛 {theme_text}")
         if 'theme_label' in self.tooltips:
             tt_theme_label = tr('tt_theme_label', l) or tr('tt_theme_label', 'en') or 'Theme-Label-Tooltip'
             self.tooltips['theme_label'].set_text(tt_theme_label)
@@ -550,41 +554,45 @@ class ModernApp:
         if self.texture_settings is not None:
             self.texture_settings.config(text=tr('texture_settings', l) or "")
         if self.size_label is not None:
-            self.size_label.config(text=tr('image_size', l) or "")
+            self.size_label.config(text=f"📐 {tr('image_size', l) or ''}")
         if self.lang_label is not None:
-            self.lang_label.config(text=tr('language', l) or "")
+            self.lang_label.config(text=f"🌐 {tr('language', l) or ''}")
+        if self.bg_label is not None:
+            self.bg_label.config(text=f"🎨 {tr('bg_color', l) or 'Hintergrundfarbe:'}")
+        if hasattr(self, 'transparency_bg_label') and self.transparency_bg_label is not None:
+            self.transparency_bg_label.config(text=f"💧 {tr('bg_transparency', l) or 'Transparenz:'}")
         if self.load_btn is not None:
-            self.load_btn.config(text=tr('load_gif', l) or "")
+            self.load_btn.config(text=f"📂 {tr('load_gif', l) or ''}")
         if self.save_gif_btn is not None:
-            self.save_gif_btn.config(text=tr('save_gif', l) or "")
+            self.save_gif_btn.config(text=f"💾 {tr('save_gif', l) or ''}")
         if self.save_texture_btn is not None:
-            self.save_texture_btn.config(text=tr('save_texture', l) or "")
+            self.save_texture_btn.config(text=f"🧵 {tr('save_texture', l) or ''}")
         if self.export_lsl_btn is not None:
-            self.export_lsl_btn.config(text=tr('export_lsl', l) or "")
+            self.export_lsl_btn.config(text=f"🧾 {tr('export_lsl', l) or ''}")
         if self.status is not None:
             self.status.config(text=tr('ready', l) or "")
         # Gruppenüberschriften
         if self.master_group is not None:
-            self.master_group.config(text=tr('master_settings', l) or "")
+            self.master_group.config(text=f"🛠 {tr('master_settings', l) or ''}")
         if self.file_group is not None:
             self.file_group.config(text=tr('file', l) or "")
         if self.status_group is not None:
             self.status_group.config(text=tr('status', l) or "")
         if self.media_group is not None:
-            self.media_group.config(text=tr('media', l) or "Media")
+            self.media_group.config(text=f"🎬 {tr('media', l) or 'Media'}")
         # Buttons
         if self.clear_btn is not None:
             clear_text = tr('clear', l) or tr('clear', 'en') or 'Clear'
-            self.clear_btn.config(text=clear_text)
+            self.clear_btn.config(text=f"🧹 {clear_text}")
         if self.reset_btn is not None:
             reset_text = tr('reset', l) or tr('reset', 'en') or 'Reset'
-            self.reset_btn.config(text=reset_text)
+            self.reset_btn.config(text=f"🔄 {reset_text}")
         if self.play_btn is not None:
             self.play_btn.config(text=tr('play', l) if not self.playing else tr('pause', l) or "")
         if self.add_frame_btn is not None:
-            self.add_frame_btn.config(text=tr('add_frame', l) or "")
+            self.add_frame_btn.config(text=f"➕ {tr('add_frame', l) or ''}")
         if self.remove_frame_btn is not None:
-            self.remove_frame_btn.config(text=tr('remove_frame', l) or "Entfernen")
+            self.remove_frame_btn.config(text=f"➖ {tr('remove_frame', l) or 'Entfernen'}")
         if 'remove_frame_btn' in self.tooltips:
             self.tooltips['remove_frame_btn'].set_text(tr('tt_remove_frame_btn', l))
         # Effekte-Labels aktualisieren
@@ -626,14 +634,14 @@ class ModernApp:
                     if isinstance(colorint_btn, ttk.Checkbutton):
                         colorint_btn.config(text=tr('effect_colorintensity', l) or "")
                         if self.bg_label is not None:
-                            self.bg_label.config(text=tr('bg_color', l) or "Hintergrundfarbe:")
+                            self.bg_label.config(text=f"🎨 {tr('bg_color', l) or 'Hintergrundfarbe:'}")
         # Neue Funktionen in Master Einstellungen
         if self.framerate_label is not None:
-            self.framerate_label.config(text=tr('framerate', l) or "Framerate:")
+            self.framerate_label.config(text=f"⏱ {tr('framerate', l) or 'Framerate:'}")
         if self.export_format_label is not None:
-            self.export_format_label.config(text=tr('export_format', l) or "Exportformat:")
+            self.export_format_label.config(text=f"📤 {tr('export_format', l) or 'Exportformat:'}")
         if self.maxframes_label is not None:
-            self.maxframes_label.config(text=tr('max_images', l) or "Max. Bilder:")
+            self.maxframes_label.config(text=f"🖼 {tr('max_images', l) or 'Max. Bilder:'}")
 
 
     def change_language(self, event=None):

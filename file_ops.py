@@ -10,7 +10,7 @@ from typing import Any, List, Optional
 from tkinter import filedialog, messagebox, ttk
 from PIL import Image
 from translations import tr
-from image_processing import apply_effects
+from image_processing import apply_effects, calculate_optimal_grid
 from logging_config import get_logger
 from exceptions import (
 	ImageLoadError,
@@ -279,12 +279,12 @@ def save_texture(self: Any) -> None:
 	
 	# Versuche Tile-Informationen zu extrahieren oder berechne sie neu
 	try:
-		# Wenn die Textur nicht optimiert wurde, berechne Tiles
-		tiles_x = getattr(self, 'tiles_x', math.ceil(math.sqrt(len(self.gif_frames))))
-		tiles_y = getattr(self, 'tiles_y', math.ceil(len(self.gif_frames) / tiles_x))
+		# Wenn die Textur nicht optimiert wurde, berechne Tiles optimal
+		default_x, default_y = calculate_optimal_grid(len(self.gif_frames))
+		tiles_x = getattr(self, 'tiles_x', default_x)
+		tiles_y = getattr(self, 'tiles_y', default_y)
 	except:
-		tiles_x = math.ceil(math.sqrt(len(self.gif_frames)))
-		tiles_y = math.ceil(len(self.gif_frames) / tiles_x)
+		tiles_x, tiles_y = calculate_optimal_grid(len(self.gif_frames))
 	
 	speed_val = self.framerate_var.get()
 	speed = f"{speed_val};0"
@@ -390,8 +390,7 @@ def export_lsl(self: Any) -> None:
 		return
 	logger.info("Starting LSL script export")
 	frame_count = self.frame_count
-	tiles_x = math.ceil(math.sqrt(frame_count))
-	tiles_y = math.ceil(frame_count / tiles_x)
+	tiles_x, tiles_y = calculate_optimal_grid(frame_count)
 	name = "texture"
 	if self.gif_image and hasattr(self.gif_image, 'filename'):
 		name = os.path.splitext(os.path.basename(self.gif_image.filename))[0]
