@@ -85,7 +85,7 @@ GUI_ACCENT_FG = "black"
 GUI_ACCENT_WIDTH = 8
 GUI_ACCENT_HEIGHT = 1
 # Label-Größen
-GUI_LABEL_WIDTH = 12
+GUI_LABEL_WIDTH = 20
 GUI_LABEL_HEIGHT = 1
 
 def create_effects_panel(self, parent, prefix):
@@ -327,7 +327,7 @@ def build_layout(self):
 	# Bildgröße
 	size_row = ttk.Frame(left_frame)
 	size_row.pack(fill=tk.X, pady=(4,2))
-	self.size_label = ttk.Label(size_row, text=f"📐 {tr('image_size', self.lang) or 'Bildgröße:'}", background="#e0f7fa", foreground="black", relief=tk.FLAT, borderwidth=1, width=12, anchor="w", font=GUI_FONT)
+	self.size_label = ttk.Label(size_row, text=f"📐 {tr('image_size', self.lang) or 'Bildgröße:'}", background="#e0f7fa", foreground="black", relief=tk.FLAT, borderwidth=1, width=20, anchor="w", font=GUI_FONT)
 	self.size_label.pack(side=tk.LEFT, padx=(0,4), ipady=6)
 	self.tooltips['size_label'] = ToolTip(self.size_label, tr('tt_size_label', self.lang))
 	self.width_var = tk.IntVar(value=self.image_width)
@@ -370,7 +370,7 @@ def build_layout(self):
 	# Bildrate
 	framerate_row = ttk.Frame(left_frame)
 	framerate_row.pack(fill=tk.X, pady=(4,2))
-	self.framerate_label = ttk.Label(framerate_row, text=f"⏱ {tr('framerate', self.lang) or 'Framerate:'}", background="#bbdefb", foreground="black", relief=tk.FLAT, borderwidth=1, width=12, anchor="w", font=GUI_FONT)
+	self.framerate_label = ttk.Label(framerate_row, text=f"⏱ {tr('framerate', self.lang) or 'Framerate:'}", background="#bbdefb", foreground="black", relief=tk.FLAT, borderwidth=1, width=20, anchor="w", font=GUI_FONT)
 	self.framerate_label.pack(side=tk.LEFT, padx=(0,4), ipady=6)
 	self.tooltips['framerate_label'] = ToolTip(self.framerate_label, tr('tt_framerate_label', self.lang))
 	self.framerate_var = tk.IntVar(value=10)
@@ -380,7 +380,7 @@ def build_layout(self):
 	# Max. Bilder
 	maxframes_row = ttk.Frame(left_frame)
 	maxframes_row.pack(fill=tk.X, pady=(4,2))
-	self.maxframes_label = ttk.Label(maxframes_row, text=f"🖼 {tr('max_images', self.lang) or 'Max. Bilder:'}", background="#c8e6c9", foreground="black", relief=tk.FLAT, borderwidth=1, width=12, anchor="w", font=GUI_FONT)
+	self.maxframes_label = ttk.Label(maxframes_row, text=f"🖼 {tr('max_images', self.lang) or 'Max. Bilder:'}", background="#c8e6c9", foreground="black", relief=tk.FLAT, borderwidth=1, width=20, anchor="w", font=GUI_FONT)
 	self.maxframes_label.pack(side=tk.LEFT, padx=(0,4), ipady=6)
 	self.tooltips['maxframes_label'] = ToolTip(self.maxframes_label, tr('tt_maxframes_label', self.lang))
 	self.maxframes_var = tk.IntVar(value=64)
@@ -398,7 +398,7 @@ def build_layout(self):
 	# Hintergrundfarbe
 	bg_row = ttk.Frame(middle_frame)
 	bg_row.pack(fill=tk.X, pady=(4,2))
-	self.bg_label = ttk.Label(bg_row, text=f"🎨 {tr('bg_color', self.lang) or 'Hintergrundfarbe:'}", background="#fff9c4", foreground="black", relief=tk.FLAT, borderwidth=1, width=16, anchor="w", font=GUI_FONT)
+	self.bg_label = ttk.Label(bg_row, text=f"🎨 {tr('bg_color', self.lang) or 'Hintergrundfarbe:'}", background="#fff9c4", foreground="black", relief=tk.FLAT, borderwidth=1, width=23, anchor="w", font=GUI_FONT)
 	self.bg_label.pack(side=tk.LEFT, padx=(0,4), ipady=6)
 	self.tooltips['bg_label'] = ToolTip(self.bg_label, tr('tt_bg_label', self.lang))
 	self.bg_color = "#00000000"
@@ -420,7 +420,7 @@ def build_layout(self):
 		foreground="black",
 		relief=tk.FLAT,
 		borderwidth=1,
-		width=16,
+		width=23,
 		anchor="w",
 		font=GUI_FONT
 	)

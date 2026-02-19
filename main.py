@@ -79,7 +79,7 @@ except Exception as e:
 
 LANGUAGES = ['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt', 'uk', 'ja', 'zh']
 Version = "2.0.12"
-WindowsSize  = "1500x1550"
+WindowsSize  = "1650x1550"
 
 class ModernApp:
     def _bind_effects_panel_events(self):
