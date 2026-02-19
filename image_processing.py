@@ -1,7 +1,7 @@
 ###
 # image_processing.py
 # This file contains functions for processing images and GIFs within the OSSL2Gif application.
-# Version 2.0.0 © 2026 by Manfred Zainhofer
+# OSSL2Gif Version 2.0.0 © 2026 by Manfred Zainhofer
 ###
 
 
@@ -11,13 +11,17 @@ from PIL import ImageColor, ImageEnhance, ImageFilter
 import math
 import os
 import threading
+import queue
 from threading_utils import gif_queue, texture_queue
 from logging_config import get_logger
 from exceptions import ImageProcessingError, TextureGenerationError, ThreadingError
+from app_types import RGBAColor, EffectConfig, GIFFrameList, TextureData, ModernAppProtocol
+from worker_pool import get_worker_pool
+from event_bus import get_event_bus, EventType
 
 logger = get_logger(__name__)
 
-def create_smart_scaled_texture(self: Any, target_w: int, target_h: int, bg_rgba: Tuple[int, int, int, int], preview_mode: bool = True) -> Image.Image:
+def create_smart_scaled_texture(self: ModernAppProtocol, target_w: int, target_h: int, bg_rgba: RGBAColor, preview_mode: bool = True) -> Image.Image:
 	"""
 	Erstellt eine Texture mit intelligenter Skalierung:
 	1. Berechnet optimale Größe basierend auf Frame-Größen
@@ -218,7 +222,7 @@ def _apply_bg_to_image(self: Any, img: Image.Image) -> Image.Image:
 			return img.convert("RGB")
 		return img
 
-def _process_gif_frame_worker(self: Any, current_frame: int, canvas_w: int, canvas_h: int, texture_w: int, texture_h: int) -> None:
+def _process_gif_frame_worker(self: ModernAppProtocol, current_frame: int, canvas_w: int, canvas_h: int, texture_w: int, texture_h: int) -> None:
 	"""Worker-Thread für GIF-Frame-Verarbeitung"""
 	try:
 		if not self.gif_frames or current_frame < 0 or current_frame >= len(self.gif_frames):
@@ -241,7 +245,7 @@ def _process_gif_frame_worker(self: Any, current_frame: int, canvas_w: int, canv
 		logger.error(f"Error in GIF frame processing: {e}", exc_info=True)
 		gif_queue.put((self, None))
 
-def _check_gif_queue(self: Any) -> None:
+def _check_gif_queue(self: ModernAppProtocol) -> None:
 	"""Prüft die GIF-Queue und aktualisiert die Canvas"""
 	try:
 		while True:
@@ -255,13 +259,15 @@ def _check_gif_queue(self: Any) -> None:
 				# Textur-Update NICHT bei jedem Frame (zu langsam)
 				# Wird nur bei Frame-Änderungen (Add/Remove) oder Einstellungsänderungen aufgerufen
 				return
-	except Exception:
-		pass
+	except queue.Empty:
+		pass  # Kein Element in Queue
+	except Exception as e:
+		logger.error(f"Error processing GIF frame from queue: {type(e).__name__}: {e}", exc_info=False)
 	# Wiederholen
 	if hasattr(self, 'root') and self.root:
 		self.root.after(10, lambda: _check_gif_queue(self))
 
-def show_gif_frame(self: Any) -> None:
+def show_gif_frame(self: ModernAppProtocol) -> None:
 	"""Zeigt den aktuellen GIF-Frame mit Threading"""
 	if not self.gif_frames:
 		self.gif_canvas.config(image="")
@@ -274,13 +280,14 @@ def show_gif_frame(self: Any) -> None:
 		texture_w = self.texture_canvas.winfo_width()
 		texture_h = self.texture_canvas.winfo_height()
 		
-		# Worker in separatem Thread starten
-		worker_thread = threading.Thread(
-			target=_process_gif_frame_worker,
-			args=(self, self.current_frame, canvas_w, canvas_h, texture_w, texture_h),
-			daemon=True
+		# Worker über Pool starten (nicht neuer Thread jedes Mal)
+		pool = get_worker_pool(max_workers=2)
+		task_name = f"gif_frame_{self.current_frame}"
+		pool.submit(
+			task_name,
+			_process_gif_frame_worker,
+			self, self.current_frame, canvas_w, canvas_h, texture_w, texture_h
 		)
-		worker_thread.start()
 		
 		# Queue-Prüfung starten
 		_check_gif_queue(self)
@@ -288,7 +295,7 @@ def show_gif_frame(self: Any) -> None:
 		from tkinter import messagebox
 		messagebox.showerror("Fehler", f"Fehler bei GIF-Vorschau: {e}")
 
-def _process_texture_worker(self: Any) -> None:
+def _process_texture_worker(self: ModernAppProtocol) -> None:
 	"""Worker-Thread für Texture-Sheet-Verarbeitung"""
 	try:
 		from tkinter import messagebox
@@ -355,7 +362,7 @@ def _process_texture_worker(self: Any) -> None:
 		logger.error(f"Fatal error in texture worker thread: {e}", exc_info=True)
 		texture_queue.put((self, None))
 
-def _check_texture_queue(self: Any) -> None:
+def _check_texture_queue(self: ModernAppProtocol) -> None:
 	"""Prüft die Texture-Queue und aktualisiert die Canvas"""
 	try:
 		while True:
@@ -368,23 +375,23 @@ def _check_texture_queue(self: Any) -> None:
 					self._texture_img_ref = img
 					self.texture_canvas.config(image=img)
 				return
-	except Exception:
-		pass
+	except queue.Empty:
+		pass  # Kein Element in Queue
+	except Exception as e:
+		logger.error(f"Error processing texture from queue: {type(e).__name__}: {e}", exc_info=False)
 	# Wiederholen
 	if hasattr(self, 'root') and self.root:
 		self.root.after(10, lambda: _check_texture_queue(self))
 
-def show_texture(self: Any) -> None:
+def show_texture(self: ModernAppProtocol) -> None:
 	"""Erzeugt und zeigt das Texture-Sheet mit Threading"""
-	# Worker in separatem Thread starten
-	worker_thread = threading.Thread(
-		target=_process_texture_worker,
-		args=(self,),
-		daemon=True
+	# Worker über Pool starten (nicht neuer Thread jedes Mal)
+	pool = get_worker_pool(max_workers=2)
+	pool.submit(
+		"texture_preview",
+		_process_texture_worker,
+		self
 	)
-	worker_thread.start()
-	
-	# Queue-Prüfung starten
 	_check_texture_queue(self)
 
 

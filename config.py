@@ -1,7 +1,7 @@
 ###
 # config.py
 # This file handles the configuration for the OSSL2Gif application.
-# Version 2.0.0 © 2026 by Manfred Zainhofer
+# OSSL2Gif Version 2.0.0 © 2026 by Manfred Zainhofer
 ###
 import json
 import os

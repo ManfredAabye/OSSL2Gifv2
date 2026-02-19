@@ -1,7 +1,7 @@
 ###
 # exceptions.py
 # This file defines custom exception classes for the OSSL2Gif application.
-# Version 2.0.0 © 2026 by Manfred Zainhofer
+# OSSL2Gif Version 2.0.0 © 2026 by Manfred Zainhofer
 ###
 
 """

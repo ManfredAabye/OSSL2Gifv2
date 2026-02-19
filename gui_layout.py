@@ -1,7 +1,7 @@
 ###
 # gui_layout.py
 # This file contains the layout and GUI components for the OSSL2Gif application.
-# Version 2.0.0 © 2026 by Manfred Zainhofer
+# OSSL2Gif OSSL2Gif Version 2.0.0 © 2026 by Manfred Zainhofer
 ###
 
 import tkinter as tk
@@ -9,6 +9,9 @@ from tkinter import ttk
 from PIL import Image, ImageDraw, ImageTk
 from translations import tr
 from tooltip import ToolTip
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 # === Hilfsfunktion für Transparenz-Anzeige ===
 def create_checkerboard_with_color(hex_color, alpha=255, size=24, checker_size=4):
@@ -341,8 +344,8 @@ def build_layout(self):
 			try:
 				from image_processing import show_texture
 				show_texture(self)
-			except Exception:
-				pass
+			except Exception as e:
+				logger.debug(f"Failed to update texture preview: {type(e).__name__}: {e}", exc_info=False)
 	self.width_var.trace_add('write', _update_preview_if_gif_loaded)
 	self.height_var.trace_add('write', _update_preview_if_gif_loaded)
 
@@ -358,16 +361,10 @@ def build_layout(self):
 				try:
 					from image_processing import show_texture
 					show_texture(self)
-				except Exception:
-					pass
-		except Exception:
-			pass
-
-	self.size_preset_var = tk.StringVar()
-	self.size_preset_combo = ttk.Combobox(size_row, values=["128", "256", "512", "768", "1024", "1280", "1536", "1792", "2048"], textvariable=self.size_preset_var, width=5, state="readonly")
-	self.size_preset_combo.pack(side=tk.LEFT, padx=(8,0))
-	self.size_preset_combo.bind("<<ComboboxSelected>>", set_image_size_from_preset)
-	self.tooltips['size_preset_combo'] = ToolTip(self.size_preset_combo, tr('tt_size_preset_combo', self.lang))
+				except Exception as e:
+					logger.debug(f"Failed to update texture from preset: {type(e).__name__}: {e}", exc_info=False)
+		except ValueError:
+			logger.debug(f"Invalid preset value: {preset}", exc_info=False)
 	# Bindings werden in main.py gesetzt
 	# Bildrate
 	framerate_row = ttk.Frame(left_frame)
@@ -411,6 +408,22 @@ def build_layout(self):
 	self.bg_color_box.pack(side=tk.LEFT, padx=2)
 	# Bindings werden in main.py gesetzt
 	self.tooltips['bg_color_box'] = ToolTip(self.bg_color_box, tr('tt_bg_color_box', self.lang))
+	
+	# Transparenz-Schieberegler für Hintergrundfarbe
+	transparency_bg_row = ttk.Frame(middle_frame)
+	transparency_bg_row.pack(fill=tk.X, pady=(2,4))
+	self.transparency_bg_label = ttk.Label(transparency_bg_row, text="Transparenz:", background="#fff9c4", foreground="black", relief=tk.FLAT, borderwidth=1, width=16, anchor="w", font=("Segoe UI", 9))
+	self.transparency_bg_label.pack(side=tk.LEFT, padx=(0,4), ipady=3)
+	
+	# Schieberegler (0-255, wobei 255 = vollständig sichtbar)
+	self.bg_transparency_var = tk.IntVar(value=255)
+	self.transparency_bg_scale = ttk.Scale(transparency_bg_row, from_=0, to=255, orient="horizontal", variable=self.bg_transparency_var, length=100)
+	self.transparency_bg_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+	
+	# Prozent-Label
+	self.transparency_bg_percent = ttk.Label(transparency_bg_row, text="100%", width=4, font=("Segoe UI", 9, "bold"))
+	self.transparency_bg_percent.pack(side=tk.LEFT)
+	self.tooltips['transparency_bg_scale'] = ToolTip(self.transparency_bg_scale, "Transparenz der Hintergrundfarbe einstellen")
 	
 	# Bild hinzufügen
 	add_row = ttk.Frame(middle_frame)

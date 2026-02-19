@@ -1,7 +1,7 @@
 ###
 # file_ops.py
 # This file contains file operations for the OSSL2Gif application.
-# Version 2.0.0 © 2026 by Manfred Zainhofer
+# OSSL2Gif Version 2.0.0 © 2026 by Manfred Zainhofer
 ###
 
 import math
@@ -149,13 +149,15 @@ def _load_gif_frames(self: Any, file: str) -> None:
 	if hasattr(self, 'gif_image') and self.gif_image is not None:
 		try:
 			self.gif_image.close()
-		except Exception:
-			pass
+		except Exception as e:
+			logger.debug(f"Error closing GIF image: {type(e).__name__}: {e}", exc_info=False)
 	if not frames and hasattr(self, 'gif_image'):
 		try:
 			frames.append(self.gif_image.copy())
-		except Exception:
-			messagebox.showerror("Fehler", "GIF konnte nicht geladen werden.")
+		except Exception as e:
+			error_msg = f"Failed to copy GIF frame: {type(e).__name__}: {e}"
+			logger.error(error_msg, exc_info=False)
+			messagebox.showerror(tr('error', self.lang) or "Error", tr('status_gif_corrupted', self.lang) or "GIF konnte nicht geladen werden.")
 			return
 	logger.debug(f"Loaded frames: {len(frames)}")
 	self.gif_frames = frames

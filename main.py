@@ -1,7 +1,7 @@
 ###
 # main.py
 # This file contains the main application class ModernApp, which defines the GUI and core functionality of the OSSL2Gif application.
-# Version 2.0.0 © 2026 by Manfred Zainhofer
+# OSSL2Gif Version 2.0.0 © 2026 by Manfred Zainhofer
 ###
 
 import tkinter as tk
@@ -10,12 +10,13 @@ from PIL import Image, ImageTk
 import math
 import atexit
 import logging
+from typing import Optional, List, Any
 from config import load_config, save_config
 from translations import tr
 from gui_layout import build_layout, create_effects_panel
 from image_processing import apply_effects, show_gif_frame, show_texture
 from file_ops import load_gif, save_gif, save_texture, export_lsl, generate_lsl_script
-from events import reset_settings, change_language, on_maxframes_changed, add_selected_frame_to_texture, choose_bg_color, set_transparent_bg
+from events import reset_settings, change_language, on_maxframes_changed, add_selected_frame_to_texture, choose_bg_color, set_transparent_bg, on_bg_transparency_changed
 from logging_config import get_logger
 
 try:
@@ -74,7 +75,7 @@ except Exception as e:
     DEFAULT_LANGUAGE = 'unknown'
 
 LANGUAGES = ['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt']
-Version = "2.0.8"
+Version = "2.0.10"
 WindowsSize  = "1500x1550"
 
 class ModernApp:
@@ -161,16 +162,19 @@ class ModernApp:
         from image_processing import show_gif_frame
         self.show_gif_frame = show_gif_frame.__get__(self)
         # Sprache initial aus Combobox übernehmen, falls vorhanden, sonst Standard
-        self.lang = 'de'
-        self.lang_var = None
-        self.gif_image = None
-        self.gif_frames = []
-        self.texture_image = None
-        self.frame_count = 0
-        self.current_frame = 0
-        self.timer = None
-        self.image_width = 2048
-        self.image_height = 2048
+        self.lang: str = 'de'
+        self.lang_var: Optional[tk.StringVar] = None
+        self.gif_image: Optional[Image.Image] = None
+        self.gif_frames: List[Image.Image] = []
+        self.texture_image: Optional[Image.Image] = None
+        self.frame_count: int = 0
+        self.current_frame: int = 0
+        self.timer: Optional[Any] = None
+        self.image_width: int = 2048
+        self.image_height: int = 2048
+        # PhotoImage-Referenzen (müssen behalten werden, sonst Garbage Collection)
+        self._gif_img_ref: Optional[Any] = None
+        self._texture_img_ref: Optional[Any] = None
         self.root.title(f"OSSL2Gif {Version}")
         self.root.geometry(WindowsSize)
 
@@ -226,6 +230,10 @@ class ModernApp:
         self.bg_color_photo = None  # PhotoImage für Transparenz-Anzeige
         self.bg_color = '#00000000'
         self.bg_box_color = '#000000'
+        self.bg_transparency_var = tk.IntVar(value=255)
+        self.transparency_bg_scale = None
+        self.transparency_bg_percent = None
+        self.transparency_bg_label = None
         self.framerate_label = None
         self.framerate_var = tk.IntVar(value=10)
         self.framerate_spin = None
@@ -251,8 +259,10 @@ class ModernApp:
         self.playing = False
         try:
             self.root.iconbitmap("icon.ico")
-        except Exception:
-            pass  # Icon laden ignorieren, falls Datei fehlt oder Fehler
+        except FileNotFoundError:
+            logger.debug("Icon file 'icon.ico' not found - continuing without icon")
+        except Exception as e:
+            logger.warning(f"Failed to load icon: {type(e).__name__}: {e}", exc_info=False)
         if THEME_AVAILABLE and tb is not None:
             tb.Style("superhero")
         self.tooltips = {}
@@ -293,6 +303,10 @@ class ModernApp:
         if self.bg_color_box is not None:
             self.bg_color_box.bind('<Button-1>', lambda e: choose_bg_color(self, e))
             self.bg_color_box.bind('<Button-3>', lambda e: set_transparent_bg(self))
+        
+        # Transparenz-Schieberegler für Hintergrund
+        if hasattr(self, 'bg_transparency_var'):
+            self.bg_transparency_var.trace_add('write', lambda *args: on_bg_transparency_changed(self))
 
         # Bild hinzufügen
         if self.add_frame_btn is not None:
@@ -330,8 +344,10 @@ class ModernApp:
                 import ttkbootstrap as tb
                 if config['theme']:
                     tb.Style().theme_use(config['theme'])
-            except Exception:
-                pass
+            except KeyError as e:
+                logger.warning(f"Theme configuration key missing: {e}", exc_info=False)
+            except Exception as e:
+                logger.warning(f"Failed to apply theme from config: {type(e).__name__}: {e}", exc_info=False)
         # Werte aus config dict auf GUI anwenden
         if 'lang' in config and self.lang_var is not None:
             self.lang_var.set(config['lang'])
@@ -362,6 +378,8 @@ class ModernApp:
             from gui_layout import create_checkerboard_with_color
             self.bg_color_photo = create_checkerboard_with_color(self.bg_box_color, alpha=alpha_value, size=32, checker_size=4)
             self.bg_color_box.config(image=self.bg_color_photo)
+            # Update Transparenz-Schieberegler
+            self.bg_transparency_var.set(alpha_value)
         if 'framerate' in config:
             self.framerate_var.set(config['framerate'])
         if 'export_format' in config:
