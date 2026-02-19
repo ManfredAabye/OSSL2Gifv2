@@ -1,7 +1,7 @@
 import unittest
 from PIL import Image
 import numpy as np
-from image_processing import apply_effects, apply_borderless
+from image_processing import apply_effects
 
 from typing import Any, Optional
 
@@ -61,16 +61,6 @@ class TestImageProcessing(unittest.TestCase):
         out = apply_effects(self.dummy, self.img.copy(), "gif")
         arr = np.array(out)
         self.assertTrue((arr[...,0] == arr[...,1]).all() and (arr[...,1] == arr[...,2]).all())
-
-    def test_apply_borderless(self):
-        # Test: Bild wird korrekt beschnitten
-        sheet = Image.new("RGBA", (32, 32), (255, 0, 0, 255))
-        class DummyBorderless:
-            texture_image: Any  # type: ignore
-        dummy = DummyBorderless()
-        dummy.texture_image = None
-        apply_borderless(dummy, sheet, 32, 32, 2, 2)
-        self.assertEqual(dummy.texture_image.size, (32, 32))
 
 if __name__ == "__main__":
     unittest.main()

@@ -161,7 +161,6 @@ def create_effects_panel(self, parent, prefix):
 	colorint_scale.pack(side=tk.RIGHT, padx=5)
 	self.__dict__[f'{prefix}_colorint_scale'] = colorint_scale
 	return frame
-
 def build_layout(self):
 	# --- Theme-Auswahl (nur wenn ttkbootstrap verfügbar) ---
 	try:
@@ -412,32 +411,7 @@ def build_layout(self):
 	self.bg_color_box.pack(side=tk.LEFT, padx=2)
 	# Bindings werden in main.py gesetzt
 	self.tooltips['bg_color_box'] = ToolTip(self.bg_color_box, tr('tt_bg_color_box', self.lang))
-	# Randlos
-	borderless_row = ttk.Frame(middle_frame)
-	borderless_row.pack(fill=tk.X, pady=(4,2))
-	self.borderless_var = tk.IntVar(value=0)
-	# Bindings werden in main.py gesetzt
-	self.borderless_label = ttk.Label(
-		borderless_row,
-		text=tr('borderless', self.lang) or "Randlos:",
-		background="#c4fff9",
-		foreground="black",
-		relief=tk.FLAT,
-		borderwidth=1,
-		width=16,
-		anchor="w",
-		font=("Segoe UI", 10)
-	)
-	self.borderless_label.pack(side=tk.LEFT, padx=(0,4), ipady=6)
-	self.tooltips['borderless_label'] = ToolTip(self.borderless_label, tr('tt_borderless', self.lang))
-	self.borderless_chk = ttk.Checkbutton(borderless_row, text="", variable=self.borderless_var)
-	self.borderless_chk.pack(side=tk.LEFT)
-	try:
-		self.borderless_chk.configure(style="PastellBorderless.TCheckbutton")
-		style = ttk.Style()
-		style.configure("PastellBorderless.TCheckbutton")
-	except Exception:
-		pass
+	
 	# Bild hinzufügen
 	add_row = ttk.Frame(middle_frame)
 	add_row.pack(fill=tk.X, pady=(4,2))

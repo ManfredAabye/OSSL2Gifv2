@@ -18,12 +18,7 @@ def reset_settings(self):
 	from gui_layout import create_checkerboard_with_color
 	self.bg_color_photo = create_checkerboard_with_color(self.bg_box_color, alpha=0, size=32, checker_size=4)
 	self.bg_color_box.config(image=self.bg_color_photo)
-	self.borderless_var.set(0)
-	# Label und Tooltip für Randlos explizit zurücksetzen/übersetzen
-	if hasattr(self, 'borderless_label') and self.borderless_label is not None:
-		self.borderless_label.config(text=tr('borderless', self.lang) or "Randlos")
-	if hasattr(self, 'tooltips') and 'borderless_label' in self.tooltips:
-		self.tooltips['borderless_label'].set_text(tr('tt_borderless', self.lang))
+	# Intelligente Skalierung ist jetzt immer aktiv
 	self.framerate_var.set(10)
 	self.export_format_var.set("PNG")
 	self.maxframes_var.set(64)

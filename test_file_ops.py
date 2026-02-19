@@ -5,8 +5,10 @@ import file_ops
 
 class DummyApp:
     def __init__(self):
-        self.gif_frames = []
-        self.frame_count = 0
+        # Mindestens 1 Frame, um Division-by-Zero zu vermeiden
+        frame = Image.new("RGBA", (32, 32), (255, 0, 0, 255))
+        self.gif_frames = [frame]
+        self.frame_count = 1
         self.current_frame = 0
         self.playing = False
         self.width_var = MagicMock(get=MagicMock(return_value=32))
@@ -38,14 +40,16 @@ class TestFileOps(unittest.TestCase):
     @patch("file_ops.filedialog.askopenfilename", return_value=None)
     def test_load_gif_cancel(self, mock_dialog):
         app = DummyApp()
+        initial_frames = len(app.gif_frames)
         file_ops.load_gif(app)  # Sollte einfach abbrechen
-        self.assertEqual(app.gif_frames, [])
+        self.assertEqual(len(app.gif_frames), initial_frames)
 
     @patch("file_ops.filedialog.asksaveasfilename", return_value=None)
     def test_save_gif_cancel(self, mock_dialog):
         app = DummyApp()
+        initial_frames = len(app.gif_frames)
         file_ops.save_gif(app)  # Sollte einfach abbrechen
-        self.assertEqual(app.gif_frames, [])
+        self.assertEqual(len(app.gif_frames), initial_frames)
 
     @patch("file_ops.filedialog.asksaveasfilename", return_value=None)
     def test_save_texture_cancel(self, mock_dialog):

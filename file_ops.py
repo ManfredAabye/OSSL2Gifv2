@@ -6,12 +6,20 @@
 
 import math
 import os
-import logging
-from typing import Any
+from typing import Any, List, Optional
 from tkinter import filedialog, messagebox, ttk
 from PIL import Image
 from translations import tr
 from image_processing import apply_effects
+from logging_config import get_logger
+from exceptions import (
+	ImageLoadError,
+	FileOperationError,
+	TextureGenerationError,
+	LSLExportError,
+)
+
+logger = get_logger(__name__)
 
 def import_frames_to_gif(self: Any) -> None:
 	from tkinter import filedialog
@@ -107,39 +115,49 @@ def _load_gif_frames(self: Any, file: str) -> None:
 	"""Lädt die Frames aus einer GIF-Datei und setzt gif_image, gif_frames, frame_count, current_frame."""
 	from PIL import UnidentifiedImageError
 	frames = []
+	logger.info(f"Loading GIF file: {file}")
 	try:
 		self.gif_image = Image.open(file)
 		while True:
 			frames.append(self.gif_image.copy())
 			self.gif_image.seek(len(frames))
-	except FileNotFoundError:
+	except FileNotFoundError as e:
+		error_msg = f"File not found: {file}"
+		logger.error(error_msg, exc_info=True)
 		messagebox.showerror("Fehler", f"Datei nicht gefunden: {file}")
-		return
-	except UnidentifiedImageError:
+		raise ImageLoadError(error_msg) from e
+	except UnidentifiedImageError as e:
+		error_msg = f"File is not a valid or corrupted GIF: {file}"
+		logger.error(error_msg, exc_info=True)
 		messagebox.showerror("Fehler", f"Die Datei ist kein gültiges GIF oder beschädigt: {file}")
-		return
+		raise ImageLoadError(error_msg) from e
 	except EOFError:
 		pass
-	except MemoryError:
+	except MemoryError as e:
+		error_msg = f"Insufficient memory to load GIF: {file}"
+		logger.error(error_msg, exc_info=True)
 		messagebox.showerror("Fehler", "Nicht genügend Speicher zum Laden des GIFs.")
-		return
+		raise ImageLoadError(error_msg) from e
 	except Exception as e:
+		logger.error(f"Unknown error loading GIF {file}: {e}", exc_info=True)
 		messagebox.showerror("Fehler", f"Unbekannter Fehler beim Laden des GIFs: {e}")
-		return
-	finally:
-		# Schließe die GIF-Datei, um Ressourcen freizugeben (Frames sind bereits im Speicher kopiert)
-		if hasattr(self, 'gif_image') and self.gif_image is not None:
-			try:
-				self.gif_image.close()
-			except Exception:
-				pass
+		raise ImageLoadError(f"Failed to load GIF: {str(e)}") from e
+	
+	logger.info(f"Successfully loaded GIF with {len(frames)} frames from {file}")
+	
+	# Schließe die GIF-Datei, um Ressourcen freizugeben (Frames sind bereits im Speicher kopiert)
+	if hasattr(self, 'gif_image') and self.gif_image is not None:
+		try:
+			self.gif_image.close()
+		except Exception:
+			pass
 	if not frames and hasattr(self, 'gif_image'):
 		try:
 			frames.append(self.gif_image.copy())
 		except Exception:
 			messagebox.showerror("Fehler", "GIF konnte nicht geladen werden.")
 			return
-	logging.debug(f"Frames geladen: {len(frames)}")
+	logger.debug(f"Loaded frames: {len(frames)}")
 	self.gif_frames = frames
 	self.frame_count = len(frames)
 	self.current_frame = 0
@@ -201,135 +219,174 @@ def delete_gif(self: Any) -> None:
 		self.play_btn.config(text=tr('play', self.lang) or "Play ▶", state="disabled")
 
 def save_gif(self: Any) -> None:
+	"""Speichert die GIF-Frames mit aktuellen Effekten als neue GIF-Datei."""
 	if not self.gif_frames:
+		error_msg = "No GIF loaded for saving"
+		logger.warning(error_msg)
 		messagebox.showerror("Fehler", "Kein GIF geladen.")
 		return
 	file = filedialog.asksaveasfilename(defaultextension=".gif", filetypes=[("GIF", "*.gif")])
 	if not file:
 		return
+	logger.info(f"Saving GIF to: {file}")
 	try:
 		frames = [apply_effects(self, f.resize((self.width_var.get(), self.height_var.get())), "gif") for f in self.gif_frames]
 		duration = self.framerate_var.get()
 		frames[0].save(file, save_all=True, append_images=frames[1:], loop=0, duration=duration)
+		logger.info(f"GIF saved successfully with {len(frames)} frames: {file}")
 		if hasattr(self, 'status') and self.status:
 			self.status.config(text=tr('status_gif_saved', self.lang) or "GIF gespeichert.")
-	except FileNotFoundError:
+	except FileNotFoundError as e:
+		error_msg = f"File could not be saved: {file}"
+		logger.error(error_msg, exc_info=True)
 		messagebox.showerror("Fehler", f"Datei konnte nicht gespeichert werden: {file}")
-	except MemoryError:
+		raise FileOperationError(error_msg) from e
+	except MemoryError as e:
+		error_msg = f"Insufficient memory to save GIF: {file}"
+		logger.error(error_msg, exc_info=True)
 		messagebox.showerror("Fehler", "Nicht genügend Speicher zum Speichern des GIFs.")
+		raise FileOperationError(error_msg) from e
 	except Exception as e:
+		logger.error(f"Error saving GIF {file}: {e}", exc_info=True)
 		messagebox.showerror("Fehler", f"Fehler beim Speichern des GIFs: {e}")
+		raise FileOperationError(f"Failed to save GIF: {str(e)}") from e
 
 def save_texture(self: Any) -> None:
-	if not self.gif_frames:
-		messagebox.showerror("Fehler", "Keine Frames vorhanden.")
+	"""Speichert die aktuell generierte Texture."""
+	if not hasattr(self, 'texture_image') or self.texture_image is None:
+		messagebox.showerror("Fehler", "Keine Textur generiert. Bitte zuerst auf die Textur-Vorschau klicken.")
 		return
 	
-	# Textur mit aktueller Hintergrundfarbe regenerieren (vor dem Speichern)
-	from PIL import ImageColor
+	logger.info(f"Saving texture: {self.texture_image.size}")
+	
+	# Hol dir die Zielgröße
 	tex_w = self.width_var.get() if self.width_var.get() > 0 else 2048
 	tex_h = self.height_var.get() if self.height_var.get() > 0 else 2048
 	
-	# Hintergrundfarbe parsen - unterstützt #RRGGBBAA Format
-	bg_color = getattr(self, 'bg_color', '#00000000')
-	bg_rgba: tuple[int, int, int, int] = (0, 0, 0, 0)  # Default: transparent
-	try:
-		if isinstance(bg_color, str) and len(bg_color) == 9 and bg_color.startswith('#'):
-			# Format: #RRGGBBAA
-			r = int(bg_color[1:3], 16)
-			g = int(bg_color[3:5], 16)
-			b = int(bg_color[5:7], 16)
-			a = int(bg_color[7:9], 16)
-			bg_rgba = (r, g, b, a)
-		elif isinstance(bg_color, str) and len(bg_color) == 7:
-			# Format: #RRGGBB (vollständig undurchsichtig)
-			color_result = ImageColor.getcolor(bg_color, "RGBA")
-			# Stelle sicher, dass wir ein 4er-Tupel haben
-			if isinstance(color_result, tuple) and len(color_result) >= 3:
-				bg_rgba = (int(color_result[0]), int(color_result[1]), int(color_result[2]), 255)
-		else:
-			bg_rgba = (0, 0, 0, 0)
-	except Exception:
-		bg_rgba = (0, 0, 0, 0)
+	# Skaliere das Arbeitsbild auf die Zielgröße (nur beim Speichern!)
+	if self.texture_image.size != (tex_w, tex_h):
+		logger.info(f"Scaling texture from {self.texture_image.size} to {tex_w}x{tex_h} for save")
+		sheet = self.texture_image.resize((tex_w, tex_h), Image.Resampling.LANCZOS)
+	else:
+		sheet = self.texture_image
 	
-	# Sheet mit aktueller Hintergrundfarbe erzeugen
-	frame_count = self.frame_count
-	tiles_x = math.ceil(math.sqrt(frame_count))
-	tiles_y = math.ceil(frame_count / tiles_x)
-	tile_w = tex_w // tiles_x
-	tile_h = tex_h // tiles_y
-	sheet = Image.new("RGBA", (tex_w, tex_h), bg_rgba)
-	
-	for idx, frame in enumerate(self.gif_frames):
-		tx = idx % tiles_x
-		ty = idx // tiles_x
-		f = frame.resize((tile_w, tile_h), Image.Resampling.LANCZOS)
-		f = apply_effects(self, f, prefix="texture")
-		x = tx * tile_w
-		y = ty * tile_h
-		sheet.paste(f, (x, y))
-	
-	# WICHTIG: Hintergrundfarbe in die Texture einbetten (nicht nur als Hintergrund)
-	# Wenn nicht vollständig transparent, composite gegen den Hintergrund
-	if bg_rgba[3] > 0:  # Nicht vollständig transparent
-		background = Image.new("RGBA", sheet.size, bg_rgba)
-		sheet = Image.alpha_composite(background, sheet)
-	
-	# Gespeicherte Textur für Datei-Dialog vorbereiten
+	# Extrahiere Metadaten
 	name = "texture"
 	if self.gif_image and hasattr(self.gif_image, 'filename'):
 		name = os.path.splitext(os.path.basename(self.gif_image.filename))[0]
+	
+	# Versuche Tile-Informationen zu extrahieren oder berechne sie neu
+	try:
+		# Wenn die Textur nicht optimiert wurde, berechne Tiles
+		tiles_x = getattr(self, 'tiles_x', math.ceil(math.sqrt(len(self.gif_frames))))
+		tiles_y = getattr(self, 'tiles_y', math.ceil(len(self.gif_frames) / tiles_x))
+	except:
+		tiles_x = math.ceil(math.sqrt(len(self.gif_frames)))
+		tiles_y = math.ceil(len(self.gif_frames) / tiles_x)
+	
 	speed_val = self.framerate_var.get()
 	speed = f"{speed_val};0"
 	ext = self.export_format_var.get().lower()
 	defext = f".{ext}"
 	filetypes = [(ext.upper(), f"*.{ext}") for ext in ["png", "jpg", "bmp"]]
-	file = filedialog.asksaveasfilename(defaultextension=defext, initialfile=f"{name};{tiles_x};{tiles_y};{speed}.{ext}", filetypes=filetypes)
+	file = filedialog.asksaveasfilename(
+		defaultextension=defext, 
+		initialfile=f"{name};{tiles_x};{tiles_y};{speed}.{ext}", 
+		filetypes=filetypes
+	)
 	if not file:
 		return
+	
 	fmt = self.export_format_var.get().upper()
+	
+	# ZIP-Export: Speichere Einzelbilder
 	if fmt == "ZIP":
 		import zipfile
 		try:
 			with zipfile.ZipFile(file, 'w', zipfile.ZIP_DEFLATED) as zipf:
 				for idx, frame in enumerate(self.gif_frames):
 					img = apply_effects(self, frame.resize((self.width_var.get(), self.height_var.get())), "gif")
-					img_bytes = None
 					from io import BytesIO
 					img_bytes = BytesIO()
 					img.save(img_bytes, format="PNG")
 					img_bytes.seek(0)
 					zipf.writestr(f"frame_{idx+1:03d}.png", img_bytes.read())
+			logger.info(f"ZIP export saved successfully with {len(self.gif_frames)} frames: {file}")
 			if hasattr(self, 'status') and self.status:
 				self.status.config(text=tr('status_zip_saved', self.lang) or "GIF-Einzelbilder als ZIP gespeichert.")
 		except Exception as e:
+			logger.error(f"Error exporting ZIP: {e}", exc_info=True)
 			messagebox.showerror("Fehler", f"Fehler beim ZIP-Export: {e}")
 		return
+	
+	# PNG/JPG/BMP-Export: Speichere optimierte Textur
 	if fmt == "JPG":
 		fmt = "JPEG"
+	
 	try:
 		img = sheet
+		
+		# JPG-Konvertierung (keine Transparenz möglich)
 		if fmt == "JPEG":
-			# Bei JPG: Immer zu RGB konvertieren (mit eingebetteter Hintergrundfarbe)
-			img = img.convert("RGB")
-		# Bei PNG: RGBA behalten (mit eingebetteter Hintergrundfarbe) oder zu RGB wenn nötig
+			if img.mode == 'RGBA':
+				# Erstelle weiß-Hintergrund für JPEG
+				background = Image.new('RGB', img.size, (255, 255, 255))
+				background.paste(img, mask=img.split()[3] if len(img.split()) > 3 else None)
+				img = background
+			else:
+				img = img.convert('RGB')
 		elif fmt == "PNG":
-			if img.mode != "RGBA":
-				img = img.convert("RGBA")
+			# PNG: Stelle sicher RGBA Mode (für Alpha-Kanal)
+			if img.mode != 'RGBA':
+				img = img.convert('RGBA')
+			
+			# Warnung: Prüfe ob Alpha-Kanal zu transparent ist
+			import numpy as np
+			try:
+				img_array = np.array(img)
+				if img_array.shape[2] == 4:  # Hat Alpha-Kanal
+					alpha_channel = img_array[:, :, 3]
+					fully_transparent = np.sum(alpha_channel == 0)
+					total_pixels = alpha_channel.size
+					transparency_ratio = fully_transparent / total_pixels
+					
+					if transparency_ratio > 0.9:  # Mehr als 90% transparent
+						logger.warning(f"Texture has very high transparency: {transparency_ratio*100:.1f}% fully transparent pixels")
+						messagebox.showwarning(
+							"Warnung",
+							f"Die Texture ist zu {transparency_ratio*100:.1f}% durchsichtig.\n\n"
+							f"Der Second Life Viewer könnte eine Warnung zeigen.\n"
+							f"Stelle sicher, dass du einen nicht-transparenten Hintergrund verwenden möchtest."
+						)
+			except Exception as e:
+				logger.debug(f"Could not check alpha channel: {e}")
+		
 		img.save(file, format=fmt)
+		logger.info(f"Texture saved successfully: {file} ({img.size})")
+		
 		if hasattr(self, 'status') and self.status:
-			self.status.config(text=tr('status_texture_saved', self.lang) or "Textur gespeichert.")
-	except FileNotFoundError:
-		messagebox.showerror("Fehler", f"Datei konnte nicht gespeichert werden: {file}")
-	except MemoryError:
-		messagebox.showerror("Fehler", "Nicht genügend Speicher zum Speichern der Textur.")
+			self.status.config(text=tr('status_saved', self.lang) or f"Textur gespeichert: {os.path.basename(file)}")
+
+	
+	except FileNotFoundError as e:
+		logger.error(f"File not found when saving texture: {e}")
+		messagebox.showerror("Fehler", f"Speicherort nicht gefunden: {e}")
+		raise TextureGenerationError(f"Failed to save texture - file path not found: {str(e)}") from e
+	except PermissionError as e:
+		logger.error(f"Permission denied when saving texture: {e}")
+		messagebox.showerror("Fehler", f"Berechtigung verweigert: {e}")
+		raise TextureGenerationError(f"Failed to save texture - permission denied: {str(e)}") from e
 	except Exception as e:
-		messagebox.showerror("Fehler", f"Fehler beim Speichern der Textur: {e}")
+		logger.error(f"Error saving texture: {e}", exc_info=True)
+		messagebox.showerror("Fehler", f"Fehler beim Speichern: {e}")
+		raise TextureGenerationError(f"Failed to save texture: {str(e)}") from e
 
 def export_lsl(self: Any) -> None:
+	"""Exportiert ein LSL (Linden Scripting Language) Script für Texture-Animation in Second Life/OpenSim."""
 	if not self.gif_frames:
 		messagebox.showerror("Fehler", "Kein GIF geladen.")
 		return
+	logger.info("Starting LSL script export")
 	frame_count = self.frame_count
 	tiles_x = math.ceil(math.sqrt(frame_count))
 	tiles_y = math.ceil(frame_count / tiles_x)
@@ -340,15 +397,32 @@ def export_lsl(self: Any) -> None:
 	lsl = generate_lsl_script(self, name, tiles_x, tiles_y, speed)
 	file = filedialog.asksaveasfilename(defaultextension=".lsl", initialfile=f"{name}.lsl", filetypes=[("LSL", "*.lsl"), ("Text", "*.txt")])
 	if not file:
+		logger.debug("LSL export cancelled by user")
 		return
+	logger.info(f"Saving LSL script to: {file}")
 	try:
 		with open(file, "w", encoding="utf-8") as f:
 			f.write(lsl)
+		logger.info(f"LSL script exported successfully: {file}")
 		if hasattr(self, 'status') and self.status:
 			self.status.config(text=tr('status_lsl_exported', self.lang) or "LSL-Skript exportiert.")
-	except Exception as e:
+	except FileNotFoundError as e:
+		error_msg = f"Could not save LSL script: {file}"
+		logger.error(error_msg, exc_info=True)
 		messagebox.showerror("Fehler", str(e))
+		raise LSLExportError(error_msg) from e
+	except IOError as e:
+		error_msg = f"IO error when saving LSL script: {file}"
+		logger.error(error_msg, exc_info=True)
+		messagebox.showerror("Fehler", str(e))
+		raise LSLExportError(error_msg) from e
+	except Exception as e:
+		error_msg = f"Error exporting LSL script: {str(e)}"
+		logger.error(error_msg, exc_info=True)
+		messagebox.showerror("Fehler", str(e))
+		raise LSLExportError(error_msg) from e
 
 def generate_lsl_script(self: Any, name: str, tiles_x: int, tiles_y: int, speed: float) -> str:
-		length = tiles_x * tiles_y
-		return f'''// LSL Texture Animation Script\n// Generated by OSSL2Gif\n// Texture: {name};{tiles_x};{tiles_y};{speed}\n\ninteger animOn = TRUE;\nlist effects = [LOOP];\ninteger movement = 0;\ninteger face = ALL_SIDES;\ninteger sideX = {tiles_x};\ninteger sideY = {tiles_y};\nfloat start = 0.0;\nfloat length = {length};\nfloat speed = {speed};\n\ninitAnim() {{\n    if(animOn) {{\n        integer effectBits;\n        integer i;\n        for(i = 0; i < llGetListLength(effects); i++) {{\n            effectBits = (effectBits | llList2Integer(effects,i));\n        }}\n        integer params = (effectBits|movement);\n        llSetTextureAnim(ANIM_ON|params,face,sideX,sideY,start,length,speed);\n    }}\n    else {{\n        llSetTextureAnim(0,face,sideX,sideY,start,length,speed);\n    }}\n}}\n\nfetch() {{\n     string texture = llGetInventoryName(INVENTORY_TEXTURE,0);\n            llSetTexture(texture,face);\n            // llParseString2List braucht als Trennzeichen eine Liste!\n            list data  = llParseString2List(texture,[";"],[]);\n            string X = llList2String(data,1);\n            string Y = llList2String(data,2);\n            string Z = llList2String(data,3);\n            sideX = (integer) X;\n            sideY = (integer) Y;\n            speed = (float) Z;\n            length = (float)(sideX * sideY);\n            if (speed) \n                initAnim();\n}}\n\ndefault\n{{\n    state_entry()\n    {{\n        llSetTextureAnim(FALSE, face, 0, 0, 0.0, 0.0, 1.0);\n        fetch();\n    }}\n    changed(integer what)\n    {{\n        if (what & CHANGED_INVENTORY)\n        {{\n            fetch();\n        }}\n    }}\n}}\n'''
+	"""Generiert ein LSL-Script für Texture-Animation mit den gegebenen Parametern."""
+	length = tiles_x * tiles_y
+	return f'''// LSL Texture Animation Script\n// Generated by OSSL2Gif\n// Texture: {name};{tiles_x};{tiles_y};{speed}\n\ninteger animOn = TRUE;\nlist effects = [LOOP];\ninteger movement = 0;\ninteger face = ALL_SIDES;\ninteger sideX = {tiles_x};\ninteger sideY = {tiles_y};\nfloat start = 0.0;\nfloat length = {length};\nfloat speed = {speed};\n\ninitAnim() {{\n    if(animOn) {{\n        integer effectBits;\n        integer i;\n        for(i = 0; i < llGetListLength(effects); i++) {{\n            effectBits = (effectBits | llList2Integer(effects,i));\n        }}\n        integer params = (effectBits|movement);\n        llSetTextureAnim(ANIM_ON|params,face,sideX,sideY,start,length,speed);\n    }}\n    else {{\n        llSetTextureAnim(0,face,sideX,sideY,start,length,speed);\n    }}\n}}\n\nfetch() {{\n     string texture = llGetInventoryName(INVENTORY_TEXTURE,0);\n            llSetTexture(texture,face);\n            // llParseString2List braucht als Trennzeichen eine Liste!\n            list data  = llParseString2List(texture,[";"],[]);\n            string X = llList2String(data,1);\n            string Y = llList2String(data,2);\n            string Z = llList2String(data,3);\n            sideX = (integer) X;\n            sideY = (integer) Y;\n            speed = (float) Z;\n            length = (float)(sideX * sideY);\n            if (speed) \n                initAnim();\n}}\n\ndefault\n{{\n    state_entry()\n    {{\n        llSetTextureAnim(FALSE, face, 0, 0, 0.0, 0.0, 1.0);\n        fetch();\n    }}\n    changed(integer what)\n    {{\n        if (what & CHANGED_INVENTORY)\n        {{\n            fetch();\n        }}\n    }}\n}}\n'''

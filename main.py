@@ -9,12 +9,14 @@ from tkinter import ttk, filedialog, messagebox
 from PIL import Image, ImageTk
 import math
 import atexit
+import logging
 from config import load_config, save_config
 from translations import tr
 from gui_layout import build_layout, create_effects_panel
 from image_processing import apply_effects, show_gif_frame, show_texture
 from file_ops import load_gif, save_gif, save_texture, export_lsl, generate_lsl_script
 from events import reset_settings, change_language, on_maxframes_changed, add_selected_frame_to_texture, choose_bg_color, set_transparent_bg
+from logging_config import get_logger
 
 try:
     import ttkbootstrap as tb
@@ -22,6 +24,12 @@ try:
 except ImportError:
     tb = None
     THEME_AVAILABLE = False
+
+# Initialize logger
+logger = get_logger(__name__)
+
+# Detect keyboard layout and system language on startup
+try:
     import ctypes
     import locale
 
@@ -57,15 +65,17 @@ except ImportError:
     # Voreinstellungen setzen
     DEFAULT_KEYBOARD_LAYOUT = get_keyboard_layout()
     DEFAULT_LANGUAGE = get_system_language()
-
-    import logging
-    logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
-    logging.info(f"Tastaturlayout erkannt: {DEFAULT_KEYBOARD_LAYOUT}")
-    logging.info(f"Systemsprache erkannt: {DEFAULT_LANGUAGE}")
+    
+    logger.debug(f"Detected keyboard layout: {DEFAULT_KEYBOARD_LAYOUT}")
+    logger.debug(f"Detected system language: {DEFAULT_LANGUAGE}")
+except Exception as e:
+    logger.warning(f"Failed to detect keyboard layout or system language: {e}")
+    DEFAULT_KEYBOARD_LAYOUT = 'unknown'
+    DEFAULT_LANGUAGE = 'unknown'
 
 LANGUAGES = ['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt']
-Version = "2.0.3"
-WindowsSize  = "1500x1400"
+Version = "2.0.8"
+WindowsSize  = "1500x1550"
 
 class ModernApp:
     def _bind_effects_panel_events(self):
@@ -131,12 +141,6 @@ class ModernApp:
         # Kompatibilitäts-Wrapper, damit show_texture(self) immer funktioniert
         if hasattr(self, '_update_texture'):
             self._update_texture()
-
-    # Borderless-Methoden an die Instanz binden
-    def _ensure_borderless_methods(self):
-        from image_processing import apply_borderless, remove_borderless
-        self.apply_borderless = apply_borderless.__get__(self)
-        self.remove_borderless = remove_borderless.__get__(self)
 
     # Methoden aus file_ops an die Instanz binden, falls nicht schon vorhanden
     def _ensure_file_ops_methods(self):
@@ -239,9 +243,7 @@ class ModernApp:
         self.play_btn = None
         self.stop_btn = None
         self.next_btn = None
-        self.borderless_label = None
-        self.borderless_var = tk.IntVar(value=0)
-        self.borderless_chk = None
+        
         self.export_format_label = None
         self.export_format_var = tk.StringVar(value='PNG')
         self.media_playrate_var = None  # Wird in gui_layout.py gesetzt
@@ -257,7 +259,6 @@ class ModernApp:
         # Konfiguration laden (vor build_layout, damit Werte übernommen werden)
         self._config_loaded = False
         config = load_config()
-        self._ensure_borderless_methods()
         self.build_layout()
         if config:
             self.apply_config(config)
@@ -293,11 +294,6 @@ class ModernApp:
             self.bg_color_box.bind('<Button-1>', lambda e: choose_bg_color(self, e))
             self.bg_color_box.bind('<Button-3>', lambda e: set_transparent_bg(self))
 
-        # Randlos
-        self.borderless_var.trace_add('write', lambda *args: (self.show_gif_frame(), self.show_texture()))
-        if self.borderless_chk is not None:
-            self.borderless_chk.config(command=lambda: (self.show_gif_frame(), self.show_texture()))
-
         # Bild hinzufügen
         if self.add_frame_btn is not None:
             self.add_frame_btn.config(command=lambda: add_selected_frame_to_texture(self))
@@ -317,7 +313,6 @@ class ModernApp:
             'width': self.width_var.get() if hasattr(self, 'width_var') and self.width_var is not None else 2048,
             'height': self.height_var.get() if hasattr(self, 'height_var') and self.height_var is not None else 2048,
             'bg_color': getattr(self, 'bg_color', '#00000000'),
-            'borderless': self.borderless_var.get() if hasattr(self, 'borderless_var') and self.borderless_var is not None else 0,
             'framerate': self.framerate_var.get() if hasattr(self, 'framerate_var') and self.framerate_var is not None else 10,
             'export_format': self.export_format_var.get() if hasattr(self, 'export_format_var') and self.export_format_var is not None else 'PNG',
             'maxframes': self.maxframes_var.get() if hasattr(self, 'maxframes_var') and self.maxframes_var is not None else 64,
@@ -367,8 +362,6 @@ class ModernApp:
             from gui_layout import create_checkerboard_with_color
             self.bg_color_photo = create_checkerboard_with_color(self.bg_box_color, alpha=alpha_value, size=32, checker_size=4)
             self.bg_color_box.config(image=self.bg_color_photo)
-        if 'borderless' in config:
-            self.borderless_var.set(config['borderless'])
         if 'framerate' in config:
             self.framerate_var.set(config['framerate'])
         if 'export_format' in config:
@@ -508,7 +501,6 @@ class ModernApp:
             'play_btn': 'tt_play_btn',
             'stop_btn': 'tt_stop_btn',
             'next_btn': 'tt_next_btn',
-            'borderless_label': 'tt_borderless',
             'export_format_label': 'tt_export_format_label',
             'size_preset_combo': 'tt_size_preset_combo',
         }
@@ -531,9 +523,6 @@ class ModernApp:
             if 'theme_combo' in self.tooltips:
                 tt_theme_combo = tr('tt_theme_combo', l) or tr('tt_theme_combo', 'en') or 'Theme-Combo-Tooltip'
                 self.tooltips['theme_combo'].set_text(tt_theme_combo)
-        # Label für Randlos explizit übersetzen
-        if hasattr(self, 'borderless_label') and self.borderless_label is not None:
-            self.borderless_label.config(text=tr('borderless', l) or "Randlos")
         if self.gif_label is not None:
             self.gif_label.config(text=tr('gif_preview', l) or "")
         if self.gif_settings is not None:
@@ -572,9 +561,6 @@ class ModernApp:
         if self.reset_btn is not None:
             reset_text = tr('reset', l) or tr('reset', 'en') or 'Reset'
             self.reset_btn.config(text=reset_text)
-        if self.borderless_chk is not None:
-            #self.borderless_chk.config(text=tr('borderless', l) or "")
-            self.borderless_chk.config(text="")
         if self.play_btn is not None:
             self.play_btn.config(text=tr('play', l) if not self.playing else tr('pause', l) or "")
         if self.add_frame_btn is not None:
