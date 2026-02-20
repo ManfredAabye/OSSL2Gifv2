@@ -16,7 +16,7 @@ from translations import tr
 from gui_layout import build_layout, create_effects_panel
 from image_processing import apply_effects, show_gif_frame, show_texture
 from file_ops import load_gif, save_gif, save_texture, export_lsl, generate_lsl_script
-from events import reset_settings, change_language, on_maxframes_changed, add_selected_frame_to_texture, choose_bg_color, set_transparent_bg, on_bg_transparency_changed
+from events import reset_settings, change_language, on_maxframes_changed, add_selected_frame_to_texture, choose_bg_color, set_transparent_bg, on_bg_transparency_changed, apply_background_from_config
 from logging_config import get_logger
 
 try:
@@ -78,7 +78,7 @@ except Exception as e:
     DEFAULT_LANGUAGE = 'unknown'
 
 LANGUAGES = ['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt', 'uk', 'ja', 'zh']
-Version = "2.0.12"
+Version = "2.0.14"
 WindowsSize  = "1650x1550"
 
 class ModernApp:
@@ -228,12 +228,14 @@ class ModernApp:
         self.clear_btn = None
         self.import_frames_btn = None  # Für "Bilder zu GIF"-Button
         self.size_label = None
+        self.size_preset_var = None
+        self.size_preset_combo = None
         self.bg_label = None
         self.bg_color_box = None
         self.bg_color_photo = None  # PhotoImage für Transparenz-Anzeige
         self.bg_color = '#00000000'
         self.bg_box_color = '#000000'
-        self.bg_transparency_var = tk.IntVar(value=255)
+        self.bg_transparency_var = tk.IntVar(value=100)
         self.transparency_bg_scale = None
         self.transparency_bg_percent = None
         self.transparency_bg_label = None
@@ -357,32 +359,12 @@ class ModernApp:
             self.lang = config['lang']
         if 'width' in config:
             self.width_var.set(config['width'])
+            if hasattr(self, 'size_preset_var') and self.size_preset_var is not None:
+                self.size_preset_var.set(str(config['width']))
         if 'height' in config:
             self.height_var.set(config['height'])
         if 'bg_color' in config and self.bg_color_box is not None:
-            color = config['bg_color']
-            # Prüfe, ob die Farbe gültig ist (mit oder ohne Alpha)
-            if isinstance(color, str) and len(color) >= 7:
-                # Verarbeite RGBA Format (#RRGGBBAA)
-                if len(color) == 9:
-                    self.bg_color = color
-                    self.bg_box_color = color[:7]
-                    alpha_value = int(color[7:9], 16)
-                else:
-                    self.bg_color = color + '00'  # Transparent
-                    self.bg_box_color = color
-                    alpha_value = 0
-            else:
-                color = '#000000'
-                self.bg_color = '#00000000'
-                self.bg_box_color = color
-                alpha_value = 0
-            # Update Schachbrett-Pattern
-            from gui_layout import create_checkerboard_with_color
-            self.bg_color_photo = create_checkerboard_with_color(self.bg_box_color, alpha=alpha_value, size=32, checker_size=4)
-            self.bg_color_box.config(image=self.bg_color_photo)
-            # Update Transparenz-Schieberegler
-            self.bg_transparency_var.set(alpha_value)
+            apply_background_from_config(self, config['bg_color'])
         if 'framerate' in config:
             self.framerate_var.set(config['framerate'])
         if 'export_format' in config:
@@ -546,13 +528,13 @@ class ModernApp:
                 tt_theme_combo = tr('tt_theme_combo', l) or tr('tt_theme_combo', 'en') or 'Theme-Combo-Tooltip'
                 self.tooltips['theme_combo'].set_text(tt_theme_combo)
         if self.gif_label is not None:
-            self.gif_label.config(text=tr('gif_preview', l) or "")
+            self.gif_label.config(text=f"🎞 {tr('gif_preview', l) or ''}")
         if self.gif_settings is not None:
-            self.gif_settings.config(text=tr('gif_settings', l) or "")
+            self.gif_settings.config(text=f"⚙ {tr('gif_settings', l) or ''}")
         if self.texture_label is not None:
-            self.texture_label.config(text=tr('texture_preview', l) or "")
+            self.texture_label.config(text=f"🖼 {tr('texture_preview', l) or ''}")
         if self.texture_settings is not None:
-            self.texture_settings.config(text=tr('texture_settings', l) or "")
+            self.texture_settings.config(text=f"⚙ {tr('texture_settings', l) or ''}")
         if self.size_label is not None:
             self.size_label.config(text=f"📐 {tr('image_size', l) or ''}")
         if self.lang_label is not None:
@@ -575,9 +557,9 @@ class ModernApp:
         if self.master_group is not None:
             self.master_group.config(text=f"🛠 {tr('master_settings', l) or ''}")
         if self.file_group is not None:
-            self.file_group.config(text=tr('file', l) or "")
+            self.file_group.config(text=f"📁 {tr('file', l) or ''}")
         if self.status_group is not None:
-            self.status_group.config(text=tr('status', l) or "")
+            self.status_group.config(text=f"📋 {tr('status', l) or ''}")
         if self.media_group is not None:
             self.media_group.config(text=f"🎬 {tr('media', l) or 'Media'}")
         # Buttons
@@ -599,7 +581,7 @@ class ModernApp:
         for prefix in ("gif", "texture"):
             panel = getattr(self, f"{prefix}_settings", None)
             if panel is not None:
-                panel.config(text=tr(f'{prefix}_settings', l) or "")
+                panel.config(text=f"⚙ {tr(f'{prefix}_settings', l) or ''}")
                 children = panel.winfo_children()
                 idx = 0
                 # Graustufen-Checkbutton

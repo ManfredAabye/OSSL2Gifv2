@@ -13,16 +13,92 @@ import threading
 
 logger = get_logger(__name__)
 
+def _clamp_int(value, min_value, max_value, default_value):
+	try:
+		parsed = int(round(float(value)))
+	except Exception:
+		parsed = default_value
+	return max(min_value, min(max_value, parsed))
+
+def _cancel_background_preview_update(self):
+	after_id = getattr(self, '_bg_preview_after_id', None)
+	if after_id and hasattr(self, 'root') and self.root is not None:
+		try:
+			self.root.after_cancel(after_id)
+		except Exception:
+			pass
+	self._bg_preview_after_id = None
+
+def _schedule_background_preview_update(self, delay_ms=90):
+	if not hasattr(self, 'root') or self.root is None:
+		update_previews(self)
+		return
+
+	_cancel_background_preview_update(self)
+
+	def _run():
+		self._bg_preview_after_id = None
+		update_previews(self)
+
+	self._bg_preview_after_id = self.root.after(delay_ms, _run)
+
+def _apply_background_state(self, color_hex=None, transparency_percent=None, refresh_previews=True, sync_slider=False):
+	"""Zentralisiert Hintergrundfarbe + Transparenz (0-100%, 100 = voll transparent)."""
+	if color_hex is not None and isinstance(color_hex, str) and len(color_hex) == 7 and color_hex.startswith('#'):
+		self.bg_box_color = color_hex
+	elif not hasattr(self, 'bg_box_color'):
+		self.bg_box_color = "#000000"
+
+	if transparency_percent is None:
+		if hasattr(self, 'bg_transparency_var') and self.bg_transparency_var is not None:
+			transparency_percent = _clamp_int(self.bg_transparency_var.get(), 0, 100, 100)
+		else:
+			transparency_percent = 100
+	else:
+		transparency_percent = _clamp_int(transparency_percent, 0, 100, 100)
+
+	alpha = int(round(255 * (100 - transparency_percent) / 100))
+	self.bg_color = f"{self.bg_box_color}{alpha:02x}"
+
+	from gui_layout import create_checkerboard_with_color
+	self.bg_color_photo = create_checkerboard_with_color(self.bg_box_color, alpha=alpha, size=32, checker_size=4)
+	self.bg_color_box.config(image=self.bg_color_photo)
+
+	if hasattr(self, 'transparency_bg_percent') and self.transparency_bg_percent is not None:
+		self.transparency_bg_percent.config(text=f"{transparency_percent}%")
+
+	if sync_slider and hasattr(self, 'bg_transparency_var') and self.bg_transparency_var is not None:
+		current_value = _clamp_int(self.bg_transparency_var.get(), 0, 100, 100)
+		if current_value != transparency_percent:
+			self._bg_sync_in_progress = True
+			self.bg_transparency_var.set(transparency_percent)
+			self._bg_sync_in_progress = False
+
+	if refresh_previews:
+		update_previews(self)
+
+def apply_background_from_config(self, color_value):
+	"""Wendet konfigurierte Hintergrundfarbe robust an. Unterstützt #RRGGBBAA und #RRGGBB."""
+	if isinstance(color_value, str) and len(color_value) == 9 and color_value.startswith('#'):
+		base_color = color_value[:7]
+		try:
+			alpha_raw = int(color_value[7:9], 16)
+		except Exception:
+			alpha_raw = 0
+		alpha = _clamp_int(alpha_raw, 0, 255, 0)
+		transparency_percent = int(round((255 - alpha) * 100 / 255))
+		_apply_background_state(self, color_hex=base_color, transparency_percent=transparency_percent, refresh_previews=False, sync_slider=True)
+	elif isinstance(color_value, str) and len(color_value) == 7 and color_value.startswith('#'):
+		_apply_background_state(self, color_hex=color_value, transparency_percent=0, refresh_previews=False, sync_slider=True)
+	else:
+		_apply_background_state(self, color_hex="#000000", transparency_percent=100, refresh_previews=False, sync_slider=True)
+
 def reset_settings(self):
 	self.width_var.set(2048)
 	self.height_var.set(2048)
-	self.bg_color = "#00000000"
-	self.bg_box_color = "#000000"
-	self.bg_transparency_var.set(0)  # Transparenz-Schieberegler zurücksetzen
-	# Schachbrett-Pattern zurücksetzen (vollständig transparent)
-	from gui_layout import create_checkerboard_with_color
-	self.bg_color_photo = create_checkerboard_with_color(self.bg_box_color, alpha=0, size=32, checker_size=4)
-	self.bg_color_box.config(image=self.bg_color_photo)
+	if hasattr(self, 'size_preset_var') and self.size_preset_var is not None:
+		self.size_preset_var.set("2048")
+	_apply_background_state(self, color_hex="#000000", transparency_percent=100, refresh_previews=False, sync_slider=True)
 	# Intelligente Skalierung ist jetzt immer aktiv
 	self.framerate_var.set(10)
 	self.export_format_var.set("PNG")
@@ -56,10 +132,17 @@ def reset_settings(self):
 			self.gif_frames = []
 		self.frame_count = len(self.gif_frames)
 		self.current_frame = 0
-		if self.gif_frames:
-			show_gif_frame(self)
-	else:
+	if self.gif_frames:
+		show_gif_frame(self)
 		update_previews(self)
+	else:
+		self.texture_image = None
+		if hasattr(self, 'gif_canvas') and self.gif_canvas is not None:
+			self.gif_canvas.config(image="")
+		if hasattr(self, 'texture_canvas') and self.texture_canvas is not None:
+			self.texture_canvas.config(image="")
+		self._gif_img_ref = None
+		self._texture_img_ref = None
 
 def on_maxframes_changed(self, *args):
 	max_frames = self.maxframes_var.get()
@@ -83,44 +166,22 @@ def choose_bg_color(self, event=None):
 	"""Öffnet einen Color-Chooser und erlaubt die Auswahl einer transparenten Hintergrundfarbe."""
 	color = colorchooser.askcolor(color=self.bg_box_color, title="Hintergrundfarbe wählen")
 	if color and color[1]:
-		self.bg_box_color = color[1]
-		# Update Schachbrett-Pattern mit aktueller Transparenz
-		from gui_layout import create_checkerboard_with_color
-		current_alpha = self.bg_transparency_var.get()
-		alpha_hex = format(current_alpha, '02x')
-		self.bg_color = self.bg_box_color + alpha_hex
-		self.bg_color_photo = create_checkerboard_with_color(self.bg_box_color, alpha=current_alpha, size=32, checker_size=4)
-		self.bg_color_box.config(image=self.bg_color_photo)
-		update_previews(self)
+		_cancel_background_preview_update(self)
+		current_transparency = _clamp_int(self.bg_transparency_var.get(), 0, 100, 100)
+		_apply_background_state(self, color_hex=color[1], transparency_percent=current_transparency, refresh_previews=True, sync_slider=False)
 
 def on_bg_transparency_changed(self, *args):
 	"""Callback wenn der Transparenz-Schieberegler für Hintergrund bewegt wird."""
-	alpha = self.bg_transparency_var.get()
-	percent = int((alpha / 255) * 100)
-	self.transparency_bg_percent.config(text=f"{percent}%")
-	
-	# Update Hintergrundfarbe mit neuer Transparenz
-	alpha_hex = format(alpha, '02x')
-	self.bg_color = self.bg_box_color + alpha_hex
-	
-	# Update Schachbrett-Pattern
-	from gui_layout import create_checkerboard_with_color
-	self.bg_color_photo = create_checkerboard_with_color(self.bg_box_color, alpha=alpha, size=32, checker_size=4)
-	self.bg_color_box.config(image=self.bg_color_photo)
-	
-	# Update Previews
-	update_previews(self)
+	if getattr(self, '_bg_sync_in_progress', False):
+		return
+	transparency_percent = _clamp_int(self.bg_transparency_var.get(), 0, 100, 100)
+	_apply_background_state(self, transparency_percent=transparency_percent, refresh_previews=False, sync_slider=False)
+	_schedule_background_preview_update(self)
 
 def set_transparent_bg(self):
 	"""Setzt die Hintergrundfarbe auf 100% transparent (Rechtsklick auf bg_color_box)."""
-	self.bg_color = "#00000000"
-	self.bg_box_color = "#000000"
-	self.bg_transparency_var.set(0)  # Transparenz-Schieberegler auf 0
-	# Update Schachbrett-Pattern mit vollständiger Transparenz
-	from gui_layout import create_checkerboard_with_color
-	self.bg_color_photo = create_checkerboard_with_color(self.bg_box_color, alpha=0, size=32, checker_size=4)
-	self.bg_color_box.config(image=self.bg_color_photo)
-	update_previews(self)
+	_cancel_background_preview_update(self)
+	_apply_background_state(self, color_hex="#000000", transparency_percent=100, refresh_previews=True, sync_slider=True)
 
 def add_selected_frame_to_texture(self):
 	import threading
@@ -166,7 +227,6 @@ def remove_selected_frame_from_texture(self):
 def change_language(self, event=None):
 	self.lang = self.lang_var.get()
 	self.update_language()  # Tooltips und Labels übersetzen
-	update_previews(self)
 
 def update_previews(self):
 	"""Aktualisiert beide Vorschau-Canvas mit aktueller Hintergrundfarbe"""

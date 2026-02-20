@@ -89,7 +89,8 @@ GUI_LABEL_WIDTH = 20
 GUI_LABEL_HEIGHT = 1
 
 def create_effects_panel(self, parent, prefix):
-	frame = ttk.LabelFrame(parent, text=tr(f'{prefix}_settings', self.lang) or "")
+	settings_icon = "⚙"
+	frame = ttk.LabelFrame(parent, text=f"{settings_icon} {tr(f'{prefix}_settings', self.lang) or ''}")
 	self.__dict__[f'{prefix}_grayscale'] = tk.IntVar()
 	self.__dict__[f'{prefix}_sharpen'] = tk.IntVar()
 	self.__dict__[f'{prefix}_blur'] = tk.IntVar()
@@ -189,7 +190,7 @@ def build_layout(self):
 	# Linke Seite: GIF
 	left = ttk.Frame(content)
 	left.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-	self.gif_label = ttk.Label(left, text="GIF-Vorschau", font=("Segoe UI", 12, "bold"))
+	self.gif_label = ttk.Label(left, text="🎞 GIF-Vorschau", font=("Segoe UI", 12, "bold"))
 	self.gif_label.pack(pady=(0,5))
 	self.tooltips = {}
 	self.tooltips['gif_label'] = ToolTip(self.gif_label, tr('tt_gif_label', self.lang))
@@ -209,7 +210,7 @@ def build_layout(self):
 	# Rechte Seite: Textur
 	right = ttk.Frame(content)
 	right.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
-	self.texture_label = ttk.Label(right, text="Textur-Vorschau", font=("Segoe UI", 12, "bold"))
+	self.texture_label = ttk.Label(right, text="🖼 Textur-Vorschau", font=("Segoe UI", 12, "bold"))
 	self.texture_label.pack(pady=(0,5))
 	self.tooltips['texture_label'] = ToolTip(self.texture_label, tr('tt_texture_label', self.lang))
 	self.texture_canvas = tk.Label(right, bg="#222", width=40, height=16, relief=tk.SUNKEN)
@@ -233,7 +234,7 @@ def build_layout(self):
 	self.media_group.pack(fill=tk.X, padx=10, pady=(12,2))
 
 	# --- Datei-Gruppe ---
-	self.file_group = ttk.LabelFrame(main, text=tr('file', self.lang) or "Datei")
+	self.file_group = ttk.LabelFrame(main, text=f"📁 {tr('file', self.lang) or 'Datei'}")
 	self.file_group.pack(fill=tk.X, padx=10, pady=(12,2))
 	# --- Datei-Gruppe Controls ---
 
@@ -339,6 +340,13 @@ def build_layout(self):
 	self.height_entry.pack(side=tk.LEFT, padx=2)
 	self.tooltips['height_entry'] = ToolTip(self.height_entry, tr('tt_height_entry', self.lang))
 
+	# Preset-Combobox für Bildgrößen
+	self.size_preset_var = tk.StringVar(value=str(self.image_width))
+	size_presets = ["256", "512", "768", "1024", "1280", "1536", "1792", "2048"]
+	self.size_preset_combo = ttk.Combobox(size_row, textvariable=self.size_preset_var, values=size_presets, width=6, state="normal")
+	self.size_preset_combo.pack(side=tk.LEFT, padx=(6, 0))
+	self.tooltips['size_preset_combo'] = ToolTip(self.size_preset_combo, tr('tt_size_preset_combo', self.lang))
+
 	# Preview auch bei manueller Eingabe aktualisieren
 	def _update_preview_if_gif_loaded(*args):
 		if hasattr(self, 'gif_image') and self.gif_image is not None:
@@ -367,6 +375,7 @@ def build_layout(self):
 		except ValueError:
 			logger.debug(f"Invalid preset value: {preset}", exc_info=False)
 	# Bindings werden in main.py gesetzt
+	self.size_preset_combo.bind('<<ComboboxSelected>>', set_image_size_from_preset)
 	# Bildrate
 	framerate_row = ttk.Frame(left_frame)
 	framerate_row.pack(fill=tk.X, pady=(4,2))
@@ -426,9 +435,9 @@ def build_layout(self):
 	)
 	self.transparency_bg_label.pack(side=tk.LEFT, padx=(0,4), ipady=3)
 	
-	# Schieberegler (0-255, wobei 255 = vollständig sichtbar)
-	self.bg_transparency_var = tk.IntVar(value=255)
-	self.transparency_bg_scale = ttk.Scale(transparency_bg_row, from_=0, to=255, orient="horizontal", variable=self.bg_transparency_var, length=100)
+	# Schieberegler (0-100%, wobei 100% = vollständig transparent)
+	self.bg_transparency_var = tk.IntVar(value=100)
+	self.transparency_bg_scale = ttk.Scale(transparency_bg_row, from_=0, to=100, orient="horizontal", variable=self.bg_transparency_var, length=100)
 	self.transparency_bg_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
 	
 	# Prozent-Label
@@ -545,7 +554,7 @@ def build_layout(self):
 	self.tooltips['reset_btn'] = ToolTip(self.reset_btn, tr('tt_reset_btn', self.lang))
 
 	# --- Status-Gruppe ---
-	self.status_group = ttk.LabelFrame(main, text=tr('status', self.lang) or "Status")
+	self.status_group = ttk.LabelFrame(main, text=f"📋 {tr('status', self.lang) or 'Status'}")
 	self.status_group.pack(fill=tk.X, padx=10, pady=(12,8))
 	self.status = ttk.Label(self.status_group, text=tr('ready', self.lang) or "Bereit", anchor="w")
 	self.status.pack(fill=tk.X)
