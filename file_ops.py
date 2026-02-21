@@ -6,8 +6,14 @@
 
 import math
 import os
+import tkinter as tk
+from io import BytesIO
+import glob
 from typing import Any, List, Optional
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, ttk, simpledialog
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 from PIL import Image
 from translations import tr
 from image_processing import apply_effects, calculate_optimal_grid
@@ -20,6 +26,47 @@ from exceptions import (
 )
 
 logger = get_logger(__name__)
+
+def load_gif_from_path(self: Any, dropped_path: str) -> bool:
+	"""Lädt ein GIF aus einem gedroppten Dateipfad oder aus einem Ordner (erstes GIF)."""
+	if not dropped_path:
+		return False
+
+	path = os.path.normpath(dropped_path)
+	if not os.path.exists(path):
+		return False
+
+	gif_file = None
+	if os.path.isdir(path):
+		gif_candidates = sorted(glob.glob(os.path.join(path, '*.gif')))
+		if not gif_candidates:
+			if hasattr(self, 'status') and self.status:
+				self.status.config(text="Ordner enthält keine GIF-Datei.")
+			return False
+		gif_file = gif_candidates[0]
+	else:
+		if not path.lower().endswith('.gif'):
+			return False
+		gif_file = path
+
+	try:
+		self._load_gif_frames(gif_file)
+		_post_gif_load_update(self)
+		if hasattr(self, 'status') and self.status:
+			self.status.config(text=tr('frame_count', self.lang) + f": {self.frame_count} | Drag&Drop geladen")
+		return True
+	except Exception as e:
+		logger.error(f"Failed to load dropped GIF path {gif_file}: {e}", exc_info=True)
+		return False
+
+def _post_gif_load_update(self: Any) -> None:
+	"""Führt alle notwendigen GUI-Updates nach dem Laden eines GIFs aus."""
+	self._setup_frame_select()
+	self._reset_play_button()
+	self._update_status()
+	self._update_preview()
+	if hasattr(self, '_update_texture'):
+		self._update_texture()
 
 def import_frames_to_gif(self: Any) -> None:
 	from tkinter import filedialog
@@ -85,14 +132,7 @@ def load_gif_compat(self: Any) -> None:
 	if not file:
 		return
 	self._load_gif_frames(file)
-	self._setup_frame_select()
-	# Reihenfolge wird nur in _setup_frame_select gesetzt
-	self._reset_play_button()
-	self._update_status()
-	self._update_preview()
-	# Textur erst nach vollständigem Laden und Setup anzeigen
-	if hasattr(self, '_update_texture'):
-		self._update_texture()
+	_post_gif_load_update(self)
 
 def load_gif(self: Any) -> None:
 	"""
@@ -102,14 +142,129 @@ def load_gif(self: Any) -> None:
 	if not file:
 		return
 	self._load_gif_frames(file)
-	self._setup_frame_select()
-	# Reihenfolge wird nur in _setup_frame_select gesetzt
-	self._reset_play_button()
-	self._update_status()
-	self._update_preview()
-	# Textur nach GIF-Ladevorgang immer anzeigen
-	if hasattr(self, '_update_texture'):
-		self._update_texture()
+	_post_gif_load_update(self)
+
+def load_gif_from_clipboard(self: Any) -> None:
+	"""Lädt ein GIF oder Bild aus der Zwischenablage."""
+	clipboard_text = None
+	if hasattr(self, 'root') and self.root is not None:
+		try:
+			clipboard_text = self.root.clipboard_get().strip()
+		except tk.TclError:
+			clipboard_text = None
+
+	if clipboard_text and clipboard_text.lower().startswith(('http://', 'https://')):
+		load_gif_from_url(self, clipboard_text)
+		return
+
+	try:
+		from PIL import ImageGrab
+	except Exception as e:
+		logger.error(f"Clipboard support unavailable: {e}", exc_info=True)
+		messagebox.showerror("Fehler", "Zwischenablage wird auf diesem System nicht unterstützt.")
+		return
+
+	try:
+		clipboard_data = ImageGrab.grabclipboard()
+	except Exception as e:
+		logger.error(f"Failed to read clipboard: {e}", exc_info=True)
+		messagebox.showerror("Fehler", f"Zwischenablage konnte nicht gelesen werden: {e}")
+		return
+
+	if isinstance(clipboard_data, list):
+		gif_file = next(
+			(
+				path for path in clipboard_data
+				if isinstance(path, str)
+				and path.lower().endswith('.gif')
+				and os.path.isfile(path)
+			),
+			None
+		)
+		if gif_file is not None:
+			self._load_gif_frames(gif_file)
+			_post_gif_load_update(self)
+			if hasattr(self, 'status') and self.status:
+				self.status.config(text=tr('frame_count', self.lang) + f": {self.frame_count} | GIF aus Zwischenablage geladen")
+			return
+
+	if isinstance(clipboard_data, Image.Image):
+		frame = clipboard_data.convert('RGBA')
+		self.gif_image = frame.copy()
+		self.gif_frames = [frame]
+		self.frame_count = 1
+		self.current_frame = 0
+		self.playing = False
+		_post_gif_load_update(self)
+		if hasattr(self, 'status') and self.status:
+			self.status.config(text=tr('frame_count', self.lang) + f": {self.frame_count} | Bild aus Zwischenablage geladen")
+		return
+
+	if hasattr(self, 'status') and self.status:
+		self.status.config(text="Zwischenablage enthält kein GIF/Bild.")
+	else:
+		messagebox.showinfo("Hinweis", "Zwischenablage enthält kein GIF oder Bild.")
+
+def load_gif_from_url(self: Any, image_url: Optional[str] = None) -> None:
+	"""Lädt ein GIF/Bild von einer HTTP(S)-Adresse."""
+	url = image_url
+	if not url:
+		parent = self.root if hasattr(self, 'root') else None
+		url = simpledialog.askstring(
+			"Grafikadresse",
+			"Bitte Grafikadresse (http/https) eingeben:",
+			parent=parent,
+		)
+	if not url:
+		return
+
+	url = url.strip()
+	parsed = urlparse(url)
+	if parsed.scheme not in ('http', 'https') or not parsed.netloc:
+		messagebox.showerror("Fehler", "Ungültige Grafikadresse. Bitte http/https verwenden.")
+		return
+
+	frames = []
+	try:
+		request = Request(url, headers={"User-Agent": "OSSL2Gif/2.0"})
+		with urlopen(request, timeout=20) as response:
+			image_data = response.read()
+
+		if not image_data:
+			messagebox.showerror("Fehler", "Die angegebene Grafikadresse liefert keine Daten.")
+			return
+
+		image = Image.open(BytesIO(image_data))
+		while True:
+			frames.append(image.copy().convert('RGBA'))
+			image.seek(len(frames))
+	except EOFError:
+		pass
+	except HTTPError as e:
+		logger.error(f"HTTP error loading image URL {url}: {e}", exc_info=True)
+		messagebox.showerror("Fehler", f"HTTP-Fehler beim Laden: {e.code}")
+		return
+	except URLError as e:
+		logger.error(f"Network error loading image URL {url}: {e}", exc_info=True)
+		messagebox.showerror("Fehler", f"Netzwerkfehler beim Laden: {e.reason}")
+		return
+	except Exception as e:
+		logger.error(f"Failed to load image from URL {url}: {e}", exc_info=True)
+		messagebox.showerror("Fehler", f"Grafik konnte nicht geladen werden: {e}")
+		return
+
+	if not frames:
+		messagebox.showerror("Fehler", "Die Grafikadresse enthält kein lesbares Bild.")
+		return
+
+	self.gif_image = frames[0].copy()
+	self.gif_frames = frames
+	self.frame_count = len(frames)
+	self.current_frame = 0
+	self.playing = False
+	_post_gif_load_update(self)
+	if hasattr(self, 'status') and self.status:
+		self.status.config(text=tr('frame_count', self.lang) + f": {self.frame_count} | URL geladen")
 
 def _load_gif_frames(self: Any, file: str) -> None:
 	"""Lädt die Frames aus einer GIF-Datei und setzt gif_image, gif_frames, frame_count, current_frame."""

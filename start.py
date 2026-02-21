@@ -11,9 +11,23 @@ try:
 except ImportError:
 	tb = None
 	THEME_AVAILABLE = False
+try:
+	from tkinterdnd2 import TkinterDnD
+	DND_AVAILABLE = True
+except ImportError:
+	TkinterDnD = None
+	DND_AVAILABLE = False
 from logging_config import setup_logging
 from app_bootstrap import bootstrap_services, shutdown_services
 from main import ModernApp
+
+def _enable_windows_dpi_awareness() -> None:
+	"""Aktiviert DPI-Awareness unter Windows vor dem Erstellen des Tk-Root-Fensters."""
+	try:
+		from ctypes import windll
+		windll.user32.SetProcessDPIAware()
+	except Exception:
+		pass
 
 def main():
 	# Initialize logging
@@ -23,8 +37,16 @@ def main():
 	try:
 		# Bootstrap application services (config, logging, etc.)
 		bootstrap_services()
+		_enable_windows_dpi_awareness()
 		
-		if THEME_AVAILABLE and tb is not None:
+		if DND_AVAILABLE and TkinterDnD is not None:
+			root = TkinterDnD.Tk()
+			if THEME_AVAILABLE and tb is not None:
+				tb.Style("superhero")
+				logger.debug("TkinterDnD + ttkbootstrap theme 'superhero' loaded successfully")
+			else:
+				logger.debug("TkinterDnD loaded with standard tkinter style")
+		elif THEME_AVAILABLE and tb is not None:
 			root = tb.Window(themename="superhero")
 			logger.debug("ttkbootstrap theme 'superhero' loaded successfully")
 		else:

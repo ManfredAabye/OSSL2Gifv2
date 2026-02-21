@@ -18,6 +18,12 @@ from image_processing import apply_effects, show_gif_frame, show_texture
 from file_ops import load_gif, save_gif, save_texture, export_lsl, generate_lsl_script
 from events import reset_settings, change_language, on_maxframes_changed, add_selected_frame_to_texture, choose_bg_color, set_transparent_bg, on_bg_transparency_changed, apply_background_from_config
 from logging_config import get_logger
+try:
+    from tkinterdnd2 import DND_FILES
+    TKDND_AVAILABLE = True
+except ImportError:
+    DND_FILES = None
+    TKDND_AVAILABLE = False
 
 try:
     import ttkbootstrap as tb
@@ -78,7 +84,7 @@ except Exception as e:
     DEFAULT_LANGUAGE = 'unknown'
 
 LANGUAGES = ['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt', 'uk', 'ja', 'zh']
-Version = "2.0.14"
+Version = "2.0.15"
 WindowsSize  = "1650x1550"
 
 class ModernApp:
@@ -221,6 +227,7 @@ class ModernApp:
         self.height_entry = None
         self.height_var = tk.IntVar(value=2048)
         self.load_btn = None
+        self.load_url_btn = None
         self.remove_frame_btn = None  # Für Entfernen-Button (Frames)
         self.save_gif_btn = None
         self.save_texture_btn = None
@@ -282,6 +289,7 @@ class ModernApp:
         if hasattr(self, 'lang_var') and self.lang_var is not None:
             self.lang = self.lang_var.get()
         self.update_language()
+        self._setup_drag_and_drop()
         # Bindings für Effekte-Panels IMMER setzen
         self._bind_effects_panel_events()
         # Beim Beenden speichern
@@ -324,6 +332,55 @@ class ModernApp:
         # Reset
         if self.reset_btn is not None:
             self.reset_btn.config(command=lambda: reset_settings(self))
+
+        # Zwischenablage: GIF/Bild mit Strg+V einfügen
+        self.root.bind_all('<Control-v>', self.load_gif_from_clipboard)
+        self.root.bind_all('<Control-V>', self.load_gif_from_clipboard)
+
+    def _setup_drag_and_drop(self):
+        self.dragdrop_enabled = False
+        if not TKDND_AVAILABLE or DND_FILES is None:
+            logger.info("tkinterdnd2 not available - drag and drop disabled")
+            return
+
+        targets = [self.root]
+        if hasattr(self, 'gif_canvas') and self.gif_canvas is not None:
+            targets.append(self.gif_canvas)
+        if hasattr(self, 'load_btn') and self.load_btn is not None:
+            targets.append(self.load_btn)
+
+        for widget in targets:
+            try:
+                widget.drop_target_register(DND_FILES)
+                widget.dnd_bind('<<Drop>>', self.on_gif_drop)
+                self.dragdrop_enabled = True
+            except Exception as e:
+                logger.debug(f"Could not register DnD on widget {widget}: {type(e).__name__}: {e}", exc_info=False)
+
+        if self.dragdrop_enabled:
+            logger.info("Drag and drop for GIF files enabled")
+
+    def on_gif_drop(self, event):
+        self._ensure_file_ops_methods()
+        from file_ops import load_gif_from_path
+
+        dropped_items = []
+        try:
+            dropped_items = list(self.root.tk.splitlist(event.data))
+        except Exception:
+            if event.data:
+                dropped_items = [event.data]
+
+        for item in dropped_items:
+            clean_item = str(item).strip().strip('{}').strip('"')
+            if not clean_item:
+                continue
+            if load_gif_from_path(self, clean_item):
+                return "break"
+
+        if hasattr(self, 'status') and self.status:
+            self.status.config(text="Drop enthält keine gültige GIF-Datei.")
+        return "break"
 
     def get_config(self):
         # Alle relevanten Einstellungen als dict zurückgeben
@@ -545,6 +602,10 @@ class ModernApp:
             self.transparency_bg_label.config(text=f"💧 {tr('bg_transparency', l) or 'Transparenz:'}")
         if self.load_btn is not None:
             self.load_btn.config(text=f"📂 {tr('load_gif', l) or ''}")
+        if hasattr(self, 'load_url_btn') and self.load_url_btn is not None:
+            self.load_url_btn.config(text=f"🌐 {tr('load_url', l) or 'URL laden'}")
+        if 'load_url_btn' in self.tooltips:
+            self.tooltips['load_url_btn'].set_text(tr('tt_load_url_btn', l) or 'Grafik direkt von einer URL laden')
         if self.save_gif_btn is not None:
             self.save_gif_btn.config(text=f"💾 {tr('save_gif', l) or ''}")
         if self.save_texture_btn is not None:
@@ -634,6 +695,17 @@ class ModernApp:
         self._ensure_file_ops_methods()
         from file_ops import load_gif_compat
         load_gif_compat(self)
+
+    def load_gif_from_clipboard(self, event=None):
+        self._ensure_file_ops_methods()
+        from file_ops import load_gif_from_clipboard
+        load_gif_from_clipboard(self)
+        return "break"
+
+    def load_gif_from_url(self):
+        self._ensure_file_ops_methods()
+        from file_ops import load_gif_from_url
+        load_gif_from_url(self)
 
 
     def clear_texture(self):

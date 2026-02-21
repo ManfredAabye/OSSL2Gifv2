@@ -31,6 +31,11 @@ ttkbootstrap==1.20.1
 # Moderne Themes für Tkinter-Oberfläche
 # Optional, aber empfohlen für bessere UX
 
+# Drag & Drop für Datei-Import (optional)
+# ----------------------------------------
+tkinterdnd2==0.4.3
+# Ermöglicht das direkte Ziehen von GIF-Dateien/Ordnern aus dem Explorer in die App
+
 # Build-Tool (optional, nur für .exe-Erstellung)
 # -----------------------------------------------
 pyinstaller==6.19.0
