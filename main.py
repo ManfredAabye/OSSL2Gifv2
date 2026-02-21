@@ -5,7 +5,7 @@
 ###
 
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog, messagebox, simpledialog, colorchooser
 from PIL import Image, ImageTk
 import math
 import atexit
@@ -84,8 +84,8 @@ except Exception as e:
     DEFAULT_LANGUAGE = 'unknown'
 
 LANGUAGES = ['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt', 'uk', 'ja', 'zh']
-Version = "2.0.15"
-WindowsSize  = "1650x1550"
+Version = "2.1.0"
+WindowsSize  = "1650x950"
 
 class ModernApp:
     def _bind_effects_panel_events(self):
@@ -167,6 +167,17 @@ class ModernApp:
 
     def __init__(self, root):
         self.root = root
+        
+        # Setze Standardfarben für Menüs auf dunkel
+        try:
+            self.root.option_add('*Menu.background', '#2d2d2d')
+            self.root.option_add('*Menu.foreground', '#ffffff')
+            self.root.option_add('*Menu.activeBackground', '#4a4a4a')
+            self.root.option_add('*Menu.activeForeground', '#ffffff')
+            self.root.option_add('*Menu.selectColor', '#ffffff')
+        except Exception as e:
+            logger.debug(f"Could not set menu colors: {e}")
+        
         self._ensure_file_ops_methods()
         from image_processing import show_gif_frame
         self.show_gif_frame = show_gif_frame.__get__(self)
@@ -185,7 +196,7 @@ class ModernApp:
         self._gif_img_ref: Optional[Any] = None
         self._texture_img_ref: Optional[Any] = None
         self.root.title(f"OSSL2Gif {Version}")
-        self.root.geometry(WindowsSize)
+        # Fenstergeometrie wird nach build_layout() gesetzt
 
         # Effekt-Variablen initialisieren (für Pylance und Code-Vervollständigung)
         self.gif_sharpen_value = tk.DoubleVar(value=2.5)
@@ -268,7 +279,21 @@ class ModernApp:
         self.export_format_var = tk.StringVar(value='PNG')
         self.media_playrate_var = None  # Wird in gui_layout.py gesetzt
         self.media_playrate_label = None  # Für Media-Abspielrate-Label (Tooltip/Übersetzung)
+        self.menubar = None  # Menu Bar (Menüleiste oben: File, Edit, View, Groups, Help) - wird in gui_layout.py create_menubar() gesetzt
         self.playing = False
+        
+        # BooleanVars für Gruppen-Sichtbarkeit
+        self.show_gif_var = tk.BooleanVar(value=True)
+        self.show_texture_var = tk.BooleanVar(value=True)
+        self.show_master_var = tk.BooleanVar(value=True)
+        self.show_media_var = tk.BooleanVar(value=True)
+        self.show_file_var = tk.BooleanVar(value=True)
+        self.show_status_var = tk.BooleanVar(value=True)
+        
+        # Frame-Referenzen (werden in gui_layout.py gesetzt)
+        self.gif_preview_frame = None
+        self.texture_preview_frame = None
+        
         try:
             self.root.iconbitmap("icon.ico")
         except FileNotFoundError:
@@ -282,13 +307,19 @@ class ModernApp:
         self._config_loaded = False
         config = load_config()
         self.build_layout()
-        if config:
-            self.apply_config(config)
-            self._config_loaded = True
         # Nach build_layout ist self.lang_var gesetzt
         if hasattr(self, 'lang_var') and self.lang_var is not None:
             self.lang = self.lang_var.get()
+        # ZUERST die Sprache aktualisieren, damit die Textlängen korrekt sind
         self.update_language()
+        # DANN alle Größen berechnen, NACHDEM die Texte gesetzt sind
+        self.root.update_idletasks()
+        # Fenstergeometrie nach build_layout() und update_language() optimieren
+        self._optimize_window_size()
+        # Fenstergröße aus config laden, aber nicht kleiner als die optimierte Größe
+        if config:
+            self.apply_config(config)
+            self._config_loaded = True
         self._setup_drag_and_drop()
         # Bindings für Effekte-Panels IMMER setzen
         self._bind_effects_panel_events()
@@ -336,6 +367,32 @@ class ModernApp:
         # Zwischenablage: GIF/Bild mit Strg+V einfügen
         self.root.bind_all('<Control-v>', self.load_gif_from_clipboard)
         self.root.bind_all('<Control-V>', self.load_gif_from_clipboard)
+        
+        # Keyboard Shortcuts für Menü
+        self.root.bind('<Control-o>', lambda e: self.load_gif())
+        self.root.bind('<Control-O>', lambda e: self.load_gif())
+        self.root.bind('<Control-u>', lambda e: self.load_gif_from_url())
+        self.root.bind('<Control-U>', lambda e: self.load_gif_from_url())
+        self.root.bind('<Control-s>', lambda e: self.save_gif())
+        self.root.bind('<Control-S>', lambda e: self.save_gif())
+        self.root.bind('<Control-t>', lambda e: self.save_texture())
+        self.root.bind('<Control-T>', lambda e: self.save_texture())
+        self.root.bind('<Control-e>', lambda e: self.export_lsl())
+        self.root.bind('<Control-E>', lambda e: self.export_lsl())
+        self.root.bind('<Control-r>', lambda e: reset_settings(self))
+        self.root.bind('<Control-R>', lambda e: reset_settings(self))
+        self.root.bind('<Control-q>', lambda e: self.root.quit())
+        self.root.bind('<Control-Q>', lambda e: self.root.quit())
+        self.root.bind('<Control-p>', lambda e: self.show_texture_preview_window())
+        self.root.bind('<Control-P>', lambda e: self.show_texture_preview_window())
+        self.root.bind('<space>', lambda e: self.start_animation() if not self.playing else self.pause_animation())
+        self.root.bind('<Left>', lambda e: self.step_backward())
+        self.root.bind('<Right>', lambda e: self.step_forward())
+        
+        # Stelle sicher, dass ALLES komplett berechnet ist, bevor Fenster angezeigt wird
+        self.root.update_idletasks()
+        # Fenster nach vollständiger Initialisierung anzeigen
+        self.root.deiconify()
 
     def _setup_drag_and_drop(self):
         self.dragdrop_enabled = False
@@ -384,6 +441,8 @@ class ModernApp:
 
     def get_config(self):
         # Alle relevanten Einstellungen als dict zurückgeben
+        window_width = self.root.winfo_width()
+        window_height = self.root.winfo_height()
         return {
             'lang': self.lang,
             'width': self.width_var.get() if hasattr(self, 'width_var') and self.width_var is not None else 2048,
@@ -392,7 +451,9 @@ class ModernApp:
             'framerate': self.framerate_var.get() if hasattr(self, 'framerate_var') and self.framerate_var is not None else 10,
             'export_format': self.export_format_var.get() if hasattr(self, 'export_format_var') and self.export_format_var is not None else 'PNG',
             'maxframes': self.maxframes_var.get() if hasattr(self, 'maxframes_var') and self.maxframes_var is not None else 64,
-            'theme': self.theme_var.get() if hasattr(self, 'theme_var') and self.theme_var is not None else None
+            'theme': self.theme_var.get() if hasattr(self, 'theme_var') and self.theme_var is not None else None,
+            'window_width': window_width,
+            'window_height': window_height
         }
 
     def save_config(self):
@@ -428,6 +489,18 @@ class ModernApp:
             self.export_format_var.set(config['export_format'])
         if 'maxframes' in config:
             self.maxframes_var.set(config['maxframes'])
+        
+        # Fenstergröße wiederherstellen, falls in config gespeichert
+        if 'window_width' in config and 'window_height' in config:
+            window_width = config['window_width']
+            window_height = config['window_height']
+            if window_width > 0 and window_height > 0:
+                # Zentriere das Fenster auf dem Bildschirm
+                screen_width = self.root.winfo_screenwidth()
+                screen_height = self.root.winfo_screenheight()
+                x = (screen_width // 2) - (window_width // 2)
+                y = (screen_height // 2) - (window_height // 2)
+                self.root.geometry(f'{window_width}x{window_height}+{x}+{y}')
 
         # Für Pylance: Initialisiere dynamisch gesetzte GUI-Attribute
         self.gif_label = getattr(self, 'gif_label', None)
@@ -441,6 +514,58 @@ class ModernApp:
         self.file_group = getattr(self, 'file_group', None)
         # Nach dem Anwenden der Config: Effekt-Panel-Bindings erneut setzen
         self._bind_effects_panel_events()
+
+    def _optimize_window_size(self):
+        """Passt die Fenstergeometrie automatisch an den Inhalt an."""
+        try:
+            # Berechne erforderliche Größe
+            req_width = self.root.winfo_reqwidth()
+            req_height = self.root.winfo_reqheight()
+            
+            # Multiplier basierend auf Sprache: Längere Sprachen brauchen mehr Platz
+            lang_multipliers = {
+                'ru': 1.3,  # Russisch ist länger
+                'uk': 1.3,  # Ukrainisch ist länger
+                'pt': 1.1,  # Portugiesisch ist etwas länger
+                'de': 1.1,  # Deutsch ist etwas länger
+                'en': 1.0,  # Englisch Basis
+                'fr': 1.0,
+                'es': 1.0,
+                'it': 0.95,
+                'nl': 1.05,
+                'se': 0.95,
+                'pl': 1.1,
+                'ja': 0.9,  # Japanisch ist kompakter
+                'zh': 0.9   # Chinesisch ist kompakter
+            }
+            
+            current_lang = getattr(self, 'lang', 'en')
+            multiplier = lang_multipliers.get(current_lang, 1.0)
+            
+            # Setze Mindest- und Maximalgrößen
+            min_width = max(int(req_width * multiplier), 1300)
+            min_height = max(req_height, 950)  # 50 Pixel höher
+            
+            # Begrenze die Größe auf den verfügbaren Bildschirmbereich
+            screen_width = self.root.winfo_screenwidth()
+            screen_height = self.root.winfo_screenheight()
+            
+            # Verwende max. 90% des Bildschirms, aber mind. 1300x900
+            max_width = int(screen_width * 0.9)
+            max_height = int(screen_height * 0.9)
+            
+            window_width = min(min_width, max_width)
+            window_height = min(min_height, max_height)
+            
+            # Zentriere das Fenster auf dem Bildschirm
+            x = (screen_width // 2) - (window_width // 2)
+            y = (screen_height // 2) - (window_height // 2)
+            
+            self.root.geometry(f'{window_width}x{window_height}+{x}+{y}')
+        except Exception as e:
+            logger.debug(f"Could not optimize window size: {e}", exc_info=False)
+            # Fallback auf Standard-Größe
+            self.root.geometry(WindowsSize)
 
     def build_layout(self):
         build_layout(self)
@@ -685,6 +810,23 @@ class ModernApp:
             self.export_format_label.config(text=f"📤 {tr('export_format', l) or 'Exportformat:'}")
         if self.maxframes_label is not None:
             self.maxframes_label.config(text=f"🖼 {tr('max_images', l) or 'Max. Bilder:'}")
+        
+        # Menu Bar (Menüleiste oben) aktualisieren
+        if hasattr(self, 'menubar') and self.menubar is not None:
+            # Alte Menüleiste vollständig entfernen
+            try:
+                self.menubar.destroy()
+            except:
+                pass
+            self.root.config(menu=None)
+            # Wichtig: root.update() statt update_idletasks() um sicherzustellen,
+            # dass das Menü vollständig entfernt wird
+            self.root.update()
+            # Neues Menü mit aktualisierter Sprache erstellen
+            from gui_layout import create_menubar
+            create_menubar(self)
+            # Layout aktualisieren
+            self.root.update_idletasks()
 
 
     def change_language(self, event=None):
@@ -706,6 +848,349 @@ class ModernApp:
         self._ensure_file_ops_methods()
         from file_ops import load_gif_from_url
         load_gif_from_url(self)
+    
+    def _show_about_dialog(self):
+        """Zeigt einen Über-Dialog mit Versionsinformationen."""
+        l = self.lang
+        about_text = f"""OSSL2Gif {Version}
+© 2026 by Manfred Zainhofer
+
+{tr('about_description', l)}
+
+{tr('features', l)}
+• {tr('about_feature1', l)}
+• {tr('about_feature2', l)}
+• {tr('about_feature3', l)}
+• {tr('about_feature4', l)}
+• {tr('about_feature5', l)}
+
+Python {'.'.join(map(str, __import__('sys').version_info[:3]))}
+        """
+        messagebox.showinfo(tr('about', l), about_text)
+    
+    def _show_image_size_dialog(self):
+        """Zeigt einen Dialog zur Eingabe der Bildgröße."""
+        dialog = tk.Toplevel(self.root)
+        dialog.title(tr('image_size', self.lang) or "Bildgröße")
+        dialog.transient(self.root)
+        dialog.configure(bg='#2d2d2d')
+        
+        # Aktuell Werte
+        current_width = self.width_var.get()
+        current_height = self.height_var.get()
+        
+        # Frame für Eingaben
+        input_frame = ttk.Frame(dialog)
+        input_frame.pack(pady=20, padx=20, fill=tk.BOTH, expand=True)
+        
+        # Breite
+        width_label = ttk.Label(input_frame, text=f"{tr('width', self.lang) or 'Breite'}:")
+        width_label.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        width_entry = ttk.Entry(input_frame, width=10)
+        width_entry.insert(0, str(current_width))
+        width_entry.grid(row=0, column=1, padx=5, pady=5)
+        
+        # Höhe
+        height_label = ttk.Label(input_frame, text=f"{tr('height', self.lang) or 'Höhe'}:")
+        height_label.grid(row=1, column=0, padx=5, pady=5, sticky="w")
+        height_entry = ttk.Entry(input_frame, width=10)
+        height_entry.insert(0, str(current_height))
+        height_entry.grid(row=1, column=1, padx=5, pady=5)
+        
+        # Preset-Buttons
+        preset_frame = ttk.Frame(input_frame)
+        preset_frame.grid(row=2, column=0, columnspan=2, pady=10)
+        
+        presets = [256, 512, 768, 1024, 1280, 1536, 1792, 2048]
+        for i, preset in enumerate(presets):
+            btn = ttk.Button(preset_frame, text=str(preset), width=6,
+                           command=lambda p=preset: (width_entry.delete(0, tk.END),
+                                                    width_entry.insert(0, str(p)),
+                                                    height_entry.delete(0, tk.END),
+                                                    height_entry.insert(0, str(p))))
+            btn.grid(row=i // 4, column=i % 4, padx=2, pady=2)
+        
+        # OK/Abbrechen Buttons
+        def apply_size():
+            try:
+                w = int(width_entry.get())
+                h = int(height_entry.get())
+                if w > 0 and h > 0:
+                    self.width_var.set(w)
+                    self.height_var.set(h)
+                    dialog.destroy()
+                else:
+                    msgtext = tr('valid_numbers', self.lang) or 'Breite und Höhe müssen positive Zahlen sein!'
+                    messagebox.showerror(tr('error', self.lang) or 'Fehler', msgtext)
+            except ValueError:
+                msgtext = tr('invalid_input', self.lang) or 'Bitte gültige Zahlen eingeben!'
+                messagebox.showerror(tr('error', self.lang) or 'Fehler', msgtext)
+        
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(pady=10)
+        
+        ok_btn = ttk.Button(button_frame, text=tr('ok', self.lang) or 'OK', command=apply_size)
+        ok_btn.pack(side=tk.LEFT, padx=5)
+        
+        cancel_btn = ttk.Button(button_frame, text=tr('cancel', self.lang) or 'Abbrechen', command=dialog.destroy)
+        cancel_btn.pack(side=tk.LEFT, padx=5)
+        
+        # Fenster an Inhalt anpassen und zentrieren
+        dialog.update_idletasks()
+        width = dialog.winfo_reqwidth()
+        height = dialog.winfo_reqheight()
+        x = (dialog.winfo_screenwidth() // 2) - (width // 2)
+        y = (dialog.winfo_screenheight() // 2) - (height // 2)
+        dialog.geometry(f'{width}x{height}+{x}+{y}')
+        
+        dialog.grab_set()
+    
+    def _show_framerate_dialog(self):
+        """Zeigt einen Dialog zur Eingabe der Bildrate."""
+        current = self.framerate_var.get()
+        title = tr('framerate', self.lang) or "Bildrate"
+        msg = f"{tr('framerate', self.lang) or 'Bildrate'} {tr('current', self.lang) or 'Aktuell'}: {current} FPS"
+        result = simpledialog.askinteger(title, 
+                                        f"{msg}\n\n1-10000:",
+                                        initialvalue=current,
+                                        minvalue=1,
+                                        maxvalue=10000,
+                                        parent=self.root)
+        if result is not None:
+            self.framerate_var.set(result)
+    
+    def _show_max_frames_dialog(self):
+        """Zeigt einen Dialog zur Eingabe der maximalen Bildanzahl."""
+        current = self.maxframes_var.get()
+        title = tr('max_images', self.lang) or "Max. Bilder"
+        msg = f"{title} - {tr('current', self.lang) or 'Aktuell'}: {current}"
+        result = simpledialog.askinteger(title,
+                                        f"{msg}\n\n1-1024:",
+                                        initialvalue=current,
+                                        minvalue=1,
+                                        maxvalue=1024,
+                                        parent=self.root)
+        if result is not None:
+            self.maxframes_var.set(result)
+    
+    def _show_background_dialog(self):
+        """Zeigt einen Dialog zur Auswahl der Hintergrundfarbe und Transparenz."""
+        dialog = tk.Toplevel(self.root)
+        dialog.title(tr('bg_color', self.lang) or "Hintergrundfarbe")
+        dialog.transient(self.root)
+        dialog.configure(bg='#2d2d2d')
+        
+        # Aktueller Wert
+        current_color = self.bg_box_color
+        current_alpha = self.bg_transparency_var.get()
+        
+        # Frame für Vorschau
+        preview_frame = ttk.Frame(dialog)
+        preview_frame.pack(pady=20)
+        
+        preview_label = ttk.Label(preview_frame, text=f"{tr('preview', self.lang) or 'Vorschau'}:")
+        preview_label.pack(side=tk.LEFT, padx=5)
+        
+        # Vorschau-Box
+        from gui_layout import create_checkerboard_with_color
+        alpha_val = int((100 - current_alpha) * 2.55)
+        preview_photo = create_checkerboard_with_color(current_color, alpha=alpha_val, size=64, checker_size=8)
+        preview_box = tk.Label(preview_frame, image=preview_photo, relief=tk.SUNKEN)
+        preview_box.image = preview_photo  # type: ignore # Referenz halten
+        preview_box.pack(side=tk.LEFT, padx=5)
+        
+        # Farbe wählen Button
+        def choose_color():
+            nonlocal current_color
+            from tkinter import colorchooser
+            color = colorchooser.askcolor(title=tr('bg_color', self.lang) or "Farbe wählen", initialcolor=current_color)
+            if color[1]:
+                current_color = color[1]
+                # Vorschau aktualisieren
+                alpha_val = int((100 - transparency_scale.get()) * 2.55)
+                new_photo = create_checkerboard_with_color(current_color, alpha=alpha_val, size=64, checker_size=8)
+                preview_box.config(image=new_photo)
+                preview_box.image = new_photo  # type: ignore # Referenz halten
+        
+        color_btn = ttk.Button(dialog, text=f"🎨 {tr('choose_color', self.lang) or 'Farbe wählen'}", command=choose_color)
+        color_btn.pack(pady=10)
+        
+        # Transparenz-Slider
+        transparency_frame = ttk.Frame(dialog)
+        transparency_frame.pack(pady=10, padx=20, fill=tk.X)
+        
+        transparency_label = ttk.Label(transparency_frame, text=f"{tr('bg_transparency', self.lang) or 'Transparenz'}:")
+        transparency_label.pack(side=tk.LEFT, padx=5)
+        
+        transparency_scale = ttk.Scale(transparency_frame, from_=0, to=100, orient=tk.HORIZONTAL, value=current_alpha)
+        transparency_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        transparency_value_label = ttk.Label(transparency_frame, text=f"{current_alpha}%", width=5)
+        transparency_value_label.pack(side=tk.LEFT)
+        
+        def update_transparency(*args):
+            val = int(transparency_scale.get())
+            transparency_value_label.config(text=f"{val}%")
+            # Vorschau aktualisieren
+            alpha_val = int((100 - val) * 2.55)
+            new_photo = create_checkerboard_with_color(current_color, alpha=alpha_val, size=64, checker_size=8)
+            preview_box.config(image=new_photo)
+            preview_box.image = new_photo  # type: ignore # Referenz halten
+        
+        transparency_scale.config(command=update_transparency)
+        
+        # OK/Abbrechen Buttons
+        def apply_background():
+            self.bg_box_color = current_color
+            self.bg_transparency_var.set(int(transparency_scale.get()))
+            # BG-Color mit Alpha setzen
+            alpha_val = int((100 - transparency_scale.get()) * 2.55)
+            self.bg_color = f"{current_color}{alpha_val:02X}"
+            # Vorschau aktualisieren
+            if hasattr(self, 'bg_color_box') and self.bg_color_box is not None:
+                new_photo = create_checkerboard_with_color(current_color, alpha=alpha_val, size=32, checker_size=4)
+                self.bg_color_photo = new_photo
+                self.bg_color_box.config(image=new_photo)
+            # Texture neu rendern wenn GIF geladen
+            if hasattr(self, 'gif_image') and self.gif_image is not None:
+                try:
+                    from image_processing import show_texture
+                    show_texture(self)
+                except Exception as e:
+                    logger.debug(f"Failed to update texture: {e}", exc_info=False)
+            dialog.destroy()
+        
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(pady=10)
+        
+        ok_btn = ttk.Button(button_frame, text=tr('ok', self.lang) or 'OK', command=apply_background)
+        ok_btn.pack(side=tk.LEFT, padx=5)
+        
+        cancel_btn = ttk.Button(button_frame, text=tr('cancel', self.lang) or 'Abbrechen', command=dialog.destroy)
+        cancel_btn.pack(side=tk.LEFT, padx=5)
+        
+        # Fenster an Inhalt anpassen und zentrieren
+        dialog.update_idletasks()
+        width = dialog.winfo_reqwidth()
+        height = dialog.winfo_reqheight()
+        x = (dialog.winfo_screenwidth() // 2) - (width // 2)
+        y = (dialog.winfo_screenheight() // 2) - (height // 2)
+        dialog.geometry(f'{width}x{height}+{x}+{y}')
+        
+        dialog.grab_set()
+    
+    def _change_language_menu(self, lang_code):
+        """Ändert die Sprache über das Menü."""
+        if self.lang_var is not None:
+            self.lang_var.set(lang_code)
+            change_language(self, None)
+    
+    def _change_theme_menu(self, theme_name):
+        """Ändert das Theme über das Menü."""
+        if THEME_AVAILABLE and tb is not None:
+            try:
+                if self.theme_var is not None:
+                    self.theme_var.set(theme_name)
+                tb.Style().theme_use(theme_name)
+            except Exception as e:
+                logger.error(f"Failed to change theme: {e}")
+    
+    def _change_export_format_menu(self, format_name):
+        """Ändert das Exportformat über das Menü."""
+        self.export_format_var.set(format_name)
+    
+    def _toggle_gif_preview(self):
+        """Toggle GIF-Vorschau ein/aus."""
+        if self.gif_preview_frame is not None:
+            if self.show_gif_var.get():
+                self.gif_preview_frame.grid()
+            else:
+                self.gif_preview_frame.grid_remove()
+    
+    def _toggle_texture_preview(self):
+        """Toggle Textur-Vorschau ein/aus."""
+        if self.texture_preview_frame is not None:
+            if self.show_texture_var.get():
+                self.texture_preview_frame.grid()
+            else:
+                self.texture_preview_frame.grid_remove()
+    
+    def _repack_groups(self):
+        """Packt alle Gruppen in der richtigen Reihenfolge neu."""
+        # Erst alle entfernen
+        if self.master_group is not None:
+            self.master_group.pack_forget()
+        if self.media_group is not None:
+            self.media_group.pack_forget()
+        if self.file_group is not None:
+            self.file_group.pack_forget()
+        if self.status_group is not None:
+            self.status_group.pack_forget()
+        
+        # Dann in der richtigen Reihenfolge wieder einblenden (nur sichtbare)
+        if self.master_group is not None and self.show_master_var.get():
+            self.master_group.pack(fill=tk.X, padx=10, pady=(5,2))
+        if self.media_group is not None and self.show_media_var.get():
+            self.media_group.pack(fill=tk.X, padx=10, pady=(5,2))
+        if self.file_group is not None and self.show_file_var.get():
+            self.file_group.pack(fill=tk.X, padx=10, pady=(5,2))
+        if self.status_group is not None and self.show_status_var.get():
+            self.status_group.pack(fill=tk.X, padx=10, pady=(5,5))
+        
+        # Layout neu berechnen und Fenster anpassen
+        self.root.update_idletasks()
+        # Fenstergröße an Inhalt anpassen
+        try:
+            req_width = self.root.winfo_reqwidth()
+            req_height = self.root.winfo_reqheight()
+            current_width = self.root.winfo_width()
+            current_height = self.root.winfo_height()
+            
+            # Mindestgröße festlegen
+            min_width = 1300
+            min_height = 800
+            
+            # Fenstergrößen an erforderliche Größe anpassen (sowohl wachsen als auch schrumpfen)
+            new_width = max(req_width, min_width)
+            new_height = max(req_height, min_height)
+            
+            # Bildschirmgröße berücksichtigen (max 90%)
+            screen_width = self.root.winfo_screenwidth()
+            screen_height = self.root.winfo_screenheight()
+            max_width = int(screen_width * 0.9)
+            max_height = int(screen_height * 0.9)
+            
+            new_width = min(new_width, max_width)
+            new_height = min(new_height, max_height)
+            
+            # Fenster zentrieren
+            x = (screen_width // 2) - (new_width // 2)
+            y = (screen_height // 2) - (new_height // 2)
+            
+            self.root.geometry(f'{new_width}x{new_height}+{x}+{y}')
+        except Exception as e:
+            logger.debug(f"Could not adjust window size: {e}", exc_info=False)
+    
+    def _toggle_master_group(self):
+        """Toggle Master-Einstellungen ein/aus."""
+        self._repack_groups()
+    
+    def _toggle_media_group(self):
+        """Toggle Media-Gruppe ein/aus."""
+        self._repack_groups()
+    
+    def _toggle_file_group(self):
+        """Toggle Datei-Gruppe ein/aus."""
+        self._repack_groups()
+    
+    def _toggle_status_group(self):
+        """Toggle Status-Gruppe ein/aus."""
+        self._repack_groups()
+    
+    def show_texture_preview_window(self):
+        """Zeigt Textur-Vorschau wie in OpenSim/Second Life."""
+        from texture_preview import show_texture_preview
+        show_texture_preview(self)
 
 
     def clear_texture(self):

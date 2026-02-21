@@ -274,6 +274,42 @@ def _apply_bg_to_image(self: Any, img: Image.Image) -> Image.Image:
 			return img.convert("RGB")
 		return img
 
+def _resize_to_fit(img: Image.Image, target_w: int, target_h: int) -> Image.Image:
+	"""
+	Skaliert ein Bild auf die Zielgröße, behält das Seitenverhältnis und füllt mit schwarzem Hintergrund auf.
+	"""
+	if target_w < 10 or target_h < 10:
+		return img.resize((256, 256), Image.Resampling.LANCZOS)
+	
+	# Berechne Seitenverhältnisse
+	img_ratio = img.width / img.height
+	target_ratio = target_w / target_h
+	
+	# Berechne die beste Skalierungsgröße
+	if img_ratio > target_ratio:
+		# Bild ist breiter: skaliere nach Breite
+		new_w = target_w
+		new_h = int(target_w / img_ratio)
+	else:
+		# Bild ist höher: skaliere nach Höhe
+		new_h = target_h
+		new_w = int(target_h * img_ratio)
+	
+	# Skaliere das Bild
+	img_resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+	
+	# Erstelle Hintergrund-Bild mit schwarzem Hintergrund
+	background = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 255))
+	
+	# Berechne Position zum Zentrieren
+	x = (target_w - new_w) // 2
+	y = (target_h - new_h) // 2
+	
+	# Paste skaliertes Bild auf schwarzem Hintergrund
+	background.paste(img_resized, (x, y), img_resized if img_resized.mode == "RGBA" else None)
+	
+	return background
+
 def _process_gif_frame_worker(self: ModernAppProtocol, current_frame: int, canvas_w: int, canvas_h: int, texture_w: int, texture_h: int) -> None:
 	"""Worker-Thread für GIF-Frame-Verarbeitung"""
 	try:
@@ -287,7 +323,8 @@ def _process_gif_frame_worker(self: ModernAppProtocol, current_frame: int, canva
 		if max_w < 10 or max_h < 10:
 			max_w, max_h = 256, 256
 		
-		frame = frame.resize((max_w, max_h), Image.Resampling.LANCZOS)
+		# Skaliere mit proportionalem Seitenverhältnis und Letterboxing
+		frame = _resize_to_fit(frame, max_w, max_h)
 		frame = apply_effects(self, frame, prefix="gif")
 		gif_queue.put((self, frame))
 	except MemoryError as e:
@@ -421,6 +458,12 @@ def _check_texture_queue(self: ModernAppProtocol) -> None:
 			self_ref, preview_img = texture_queue.get_nowait()
 			if self_ref is self:
 				if preview_img is not None:
+					# Skaliere Texture proportional auf Canvas-Größe
+					canvas_w = self.texture_canvas.winfo_width()
+					canvas_h = self.texture_canvas.winfo_height()
+					if canvas_w > 10 and canvas_h > 10:
+						preview_img = _resize_to_fit(preview_img, canvas_w, canvas_h)
+					
 					# Zeige Transparenz mit Schachbrett-Muster an
 					display_img = _apply_bg_to_image_with_transparency(self, preview_img, show_transparency=True)
 					img = ImageTk.PhotoImage(display_img)

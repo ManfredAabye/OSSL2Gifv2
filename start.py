@@ -29,6 +29,42 @@ def _enable_windows_dpi_awareness() -> None:
 	except Exception:
 		pass
 
+def _enable_windows_dark_mode(root) -> None:
+	"""Aktiviert Windows Dark Mode für Titelleiste und Menüleiste."""
+	try:
+		import ctypes
+		from ctypes import windll, byref, c_int
+		
+		# Get window handle
+		hwnd = windll.user32.GetParent(root.winfo_id())
+		
+		# DWMWA_USE_IMMERSIVE_DARK_MODE = 20 (Windows 11) or 19 (Windows 10 older builds)
+		DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+		value = c_int(1)  # 1 = Dark Mode, 0 = Light Mode
+		
+		# Try Windows 11 attribute first
+		result = windll.dwmapi.DwmSetWindowAttribute(
+			hwnd,
+			DWMWA_USE_IMMERSIVE_DARK_MODE,
+			byref(value),
+			ctypes.sizeof(value)
+		)
+		
+		# If that fails, try Windows 10 attribute
+		if result != 0:
+			DWMWA_USE_IMMERSIVE_DARK_MODE = 19
+			windll.dwmapi.DwmSetWindowAttribute(
+				hwnd,
+				DWMWA_USE_IMMERSIVE_DARK_MODE,
+				byref(value),
+				ctypes.sizeof(value)
+			)
+		
+		# Force redraw
+		root.update_idletasks()
+	except Exception as e:
+		pass  # Silently fail if not on Windows or API not available
+
 def main():
 	# Initialize logging
 	logger = setup_logging(logging.INFO)
@@ -53,7 +89,11 @@ def main():
 			root = tk.Tk()
 			logger.debug("Using standard tkinter Tk")
 		
+		# Fenster verstecken, bis es vollständig initialisiert ist
+		root.withdraw()
+		
 		app = ModernApp(root)
+		_enable_windows_dark_mode(root)
 		logger.info("Application initialized successfully")
 		root.mainloop()
 	except Exception as e:

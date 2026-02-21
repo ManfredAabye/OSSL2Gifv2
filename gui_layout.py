@@ -10,8 +10,178 @@ from PIL import Image, ImageDraw, ImageTk
 from translations import tr
 from tooltip import ToolTip
 from logging_config import get_logger
+from events import reset_settings
 
 logger = get_logger(__name__)
+
+def create_menubar(self):
+	"""Erstellt die Menu Bar (Menüleiste) oben im Fenster.
+	
+	Die Menu Bar enthält die Hauptmenüs: File, Edit, View, Groups, Help.
+	Nicht zu verwechseln mit der File Toolbar (Button-Leiste im File-Group).
+	"""
+	menubar = tk.Menu(self.root)
+	
+	# Style für Dark Theme anpassen
+	try:
+		import ttkbootstrap as tb
+		if hasattr(self, 'root') and isinstance(self.root, (tk.Tk, tb.Window)):
+			menubar.config(  # type: ignore
+				bg='#2d2d2d',
+				fg='#ffffff',
+				activebg='#4a4a4a',
+				activeforeground='#ffffff',
+				borderwidth=0
+			)
+	except:
+		pass
+	
+	# Datei-Menü
+	file_menu = tk.Menu(menubar, tearoff=0)
+	file_menu.config(bg='#2d2d2d', fg='#ffffff', activebackground='#4a4a4a', activeforeground='#ffffff')  # type: ignore
+	file_menu.add_command(label=f"📂 {tr('load_gif', self.lang) or 'GIF laden'}", command=self.load_gif, accelerator="Strg+O")
+	file_menu.add_command(label=f"🌐 {tr('load_url', self.lang) or 'URL laden'}", command=self.load_gif_from_url, accelerator="Strg+U")
+	file_menu.add_command(label=f"📋 {tr('load_clipboard', self.lang) or 'Aus Zwischenablage'}", command=self.load_gif_from_clipboard, accelerator="Strg+V")
+	file_menu.add_separator()
+	file_menu.add_command(label=f"🧩 {tr('import_frames', self.lang) or 'Bilder zu GIF'}", command=self.import_frames_to_gif)
+	file_menu.add_separator()
+	file_menu.add_command(label=f"💾 {tr('save_gif', self.lang) or 'GIF speichern'}", command=self.save_gif, accelerator="Strg+S")
+	file_menu.add_command(label=f"🧵 {tr('save_texture', self.lang) or 'Textur speichern'}", command=self.save_texture, accelerator="Strg+T")
+	file_menu.add_command(label=f"🧾 {tr('export_lsl', self.lang) or 'LSL exportieren'}", command=self.export_lsl, accelerator="Strg+E")
+	file_menu.add_separator()
+	file_menu.add_command(label=f"🧹 {tr('clear', self.lang) or 'Löschen'}", command=self.clear_texture)
+	file_menu.add_separator()
+	file_menu.add_command(label=f"{tr('exit', self.lang) or 'Beenden'}", command=self.root.quit, accelerator="Strg+Q")
+	menubar.add_cascade(label=f"📁 {tr('file', self.lang) or 'Datei'}", menu=file_menu)
+	
+	# Bearbeiten-Menü
+	edit_menu = tk.Menu(menubar, tearoff=0)
+	edit_menu.config(bg='#2d2d2d', fg='#ffffff', activebackground='#4a4a4a', activeforeground='#ffffff')  # type: ignore
+	
+	# Master-Einstellungen direkt im Menü
+	# Bildgröße
+	edit_menu.add_command(label=f"📐 {tr('image_size', self.lang) or 'Bildgröße'}...", 
+	                      command=self._show_image_size_dialog)
+	
+	# Bildrate
+	edit_menu.add_command(label=f"⏱ {tr('framerate', self.lang) or 'Bildrate'}...", 
+	                      command=self._show_framerate_dialog)
+	
+	# Max. Bilder
+	edit_menu.add_command(label=f"🖼 {tr('max_images', self.lang) or 'Max. Bilder'}...", 
+	                      command=self._show_max_frames_dialog)
+	
+	# Hintergrundfarbe & Transparenz
+	edit_menu.add_command(label=f"🎨 {tr('bg_color', self.lang) or 'Hintergrundfarbe'}...", 
+	                      command=self._show_background_dialog)
+	
+	edit_menu.add_separator()
+	
+	# Sprache Submenü
+	lang_submenu = tk.Menu(edit_menu, tearoff=0)
+	lang_submenu.config(bg='#2d2d2d', fg='#ffffff', activebackground='#4a4a4a', activeforeground='#ffffff')  # type: ignore
+	
+	languages = [
+		('Deutsch', 'de'),
+		('English', 'en'),
+		('Français', 'fr'),
+		('Español', 'es'),
+		('Italiano', 'it'),
+		('Русский', 'ru'),
+		('Nederlands', 'nl'),
+		('Svenska', 'se'),
+		('Polski', 'pl'),
+		('Português', 'pt'),
+		('Українська', 'uk'),
+		('日本語', 'ja'),
+		('中文', 'zh')
+	]
+	
+	for lang_name, lang_code in languages:
+		lang_submenu.add_command(label=lang_name, 
+		                         command=lambda lc=lang_code: self._change_language_menu(lc))
+	
+	edit_menu.add_cascade(label=f"🌐 {tr('language', self.lang) or 'Sprache'}", menu=lang_submenu)
+	
+	# Theme Submenü (nur wenn ttkbootstrap verfügbar)
+	try:
+		import ttkbootstrap as tb
+		if tb is not None:
+			theme_submenu = tk.Menu(edit_menu, tearoff=0)
+			theme_submenu.config(bg='#2d2d2d', fg='#ffffff', activebackground='#4a4a4a', activeforeground='#ffffff')  # type: ignore
+			
+			style = tb.Style()
+			theme_names = sorted(style.theme_names())
+			
+			for theme_name in theme_names:
+				theme_submenu.add_command(label=theme_name, 
+				                        command=lambda tn=theme_name: self._change_theme_menu(tn))
+			
+			edit_menu.add_cascade(label=f"🎛 {tr('theme', self.lang) or 'Theme'}", menu=theme_submenu)
+	except:
+		pass
+	
+	# Exportformat Submenü
+	export_format_submenu = tk.Menu(edit_menu, tearoff=0)
+	export_format_submenu.config(bg='#2d2d2d', fg='#ffffff', activebackground='#4a4a4a', activeforeground='#ffffff')  # type: ignore
+	
+	formats = ['PNG', 'JPG', 'BMP', 'ZIP']
+	for fmt in formats:
+		export_format_submenu.add_command(label=fmt, 
+		                                  command=lambda f=fmt: self._change_export_format_menu(f))
+	
+	edit_menu.add_cascade(label=f"📤 {tr('export_format', self.lang) or 'Exportformat'}", menu=export_format_submenu)
+	
+	edit_menu.add_separator()
+	edit_menu.add_command(label=f"🔄 {tr('reset', self.lang) or 'Zurücksetzen'}", command=lambda: reset_settings(self), accelerator="Strg+R")
+	menubar.add_cascade(label=f"✏ {tr('edit', self.lang) or 'Bearbeiten'}", menu=edit_menu)
+	
+	# Ansicht-Menü
+	view_menu = tk.Menu(menubar, tearoff=0)
+	view_menu.config(bg='#2d2d2d', fg='#ffffff', activebackground='#4a4a4a', activeforeground='#ffffff')  # type: ignore
+	view_menu.add_command(label=f"▶ {tr('play', self.lang) or 'Abspielen'}", command=self.start_animation, accelerator="Leertaste")
+	view_menu.add_command(label=f"⏸ {tr('pause', self.lang) or 'Pause'}", command=self.pause_animation)
+	view_menu.add_command(label=f"⏹ {tr('stop', self.lang) or 'Stop'}", command=self.stop_animation)
+	view_menu.add_separator()
+	view_menu.add_command(label=f"⏮ {tr('prev_frame', self.lang) or 'Zurück'}", command=self.step_backward, accelerator="←")
+	view_menu.add_command(label=f"⏭ {tr('next_frame', self.lang) or 'Vor'}", command=self.step_forward, accelerator="→")
+	view_menu.add_separator()
+	view_menu.add_command(label=f"🎬 {tr('texture_preview_sl', self.lang) or 'Textur-Vorschau (SL/OpenSim)'}", command=self.show_texture_preview_window, accelerator="Strg+P")
+	menubar.add_cascade(label=f"👁 {tr('view', self.lang) or 'Ansicht'}", menu=view_menu)
+	
+	# Gruppen-Menü
+	groups_menu = tk.Menu(menubar, tearoff=0)
+	groups_menu.config(bg='#2d2d2d', fg='#ffffff', activebackground='#4a4a4a', activeforeground='#ffffff')  # type: ignore
+	groups_menu.add_checkbutton(label=f"🎞 {tr('show_gif_preview', self.lang) or 'GIF-Vorschau anzeigen'}", 
+	                           variable=self.show_gif_var, 
+	                           command=self._toggle_gif_preview)
+	groups_menu.add_checkbutton(label=f"🖼 {tr('show_texture_preview', self.lang) or 'Textur-Vorschau anzeigen'}", 
+	                           variable=self.show_texture_var, 
+	                           command=self._toggle_texture_preview)
+	groups_menu.add_separator()
+	groups_menu.add_checkbutton(label=f"🛠 {tr('show_master_settings', self.lang) or 'Master-Einstellungen anzeigen'}", 
+	                           variable=self.show_master_var, 
+	                           command=self._toggle_master_group)
+	groups_menu.add_checkbutton(label=f"🎬 {tr('show_media', self.lang) or 'Media anzeigen'}", 
+	                           variable=self.show_media_var, 
+	                           command=self._toggle_media_group)
+	groups_menu.add_checkbutton(label=f"📁 {tr('show_file', self.lang) or 'Datei anzeigen'}", 
+	                           variable=self.show_file_var, 
+	                           command=self._toggle_file_group)
+	groups_menu.add_checkbutton(label=f"📋 {tr('show_status', self.lang) or 'Status anzeigen'}", 
+	                           variable=self.show_status_var, 
+	                           command=self._toggle_status_group)
+	menubar.add_cascade(label=f"🗂 {tr('groups', self.lang) or 'Gruppen'}", menu=groups_menu)
+	
+	# Hilfe-Menü
+	help_menu = tk.Menu(menubar, tearoff=0)
+	help_menu.config(bg='#2d2d2d', fg='#ffffff', activebackground='#4a4a4a', activeforeground='#ffffff')  # type: ignore
+	help_menu.add_command(label=f"ℹ {tr('about', self.lang) or 'Über'}", command=lambda: self._show_about_dialog())
+	menubar.add_cascade(label=f"❓ {tr('help', self.lang) or 'Hilfe'}", menu=help_menu)
+	
+	self.root.config(menu=menubar)
+	self.menubar = menubar
+	return menubar
 
 # === Hilfsfunktion für Transparenz-Anzeige ===
 def create_checkerboard_with_color(hex_color, alpha=255, size=24, checker_size=4):
@@ -165,7 +335,15 @@ def create_effects_panel(self, parent, prefix):
 	colorint_scale.pack(side=tk.RIGHT, padx=5)
 	self.__dict__[f'{prefix}_colorint_scale'] = colorint_scale
 	return frame
+
 def build_layout(self):
+	"""Erstellt das gesamte GUI-Layout."""
+	
+	# === MENU BAR (Menüleiste oben) ===
+	# Erstellt die Hauptmenüleiste: File, Edit, View, Groups, Help
+	# Definition in create_menubar() (Zeile 17)
+	create_menubar(self)
+	
 	# --- Theme-Auswahl (nur wenn ttkbootstrap verfügbar) ---
 	try:
 		import ttkbootstrap as tb
@@ -190,13 +368,21 @@ def build_layout(self):
 	# Linke Seite: GIF
 	left = ttk.Frame(content)
 	left.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+	self.gif_preview_frame = left  # Referenz für Ein-/Ausblenden speichern
 	self.gif_label = ttk.Label(left, text="🎞 GIF-Vorschau", font=("Segoe UI", 12, "bold"))
 	self.gif_label.pack(pady=(0,5))
 	self.tooltips = {}
 	self.tooltips['gif_label'] = ToolTip(self.gif_label, tr('tt_gif_label', self.lang))
-	self.gif_canvas = tk.Label(left, bg="#222", width=40, height=16, relief=tk.SUNKEN)
+	
+	# Canvas-Container für quadratisches Aspekt-Verhältnis
+	gif_canvas_frame = tk.Frame(left, width=800, height=800, bg="#222")
+	gif_canvas_frame.pack(pady=(0, 10))
+	gif_canvas_frame.pack_propagate(False)  # Verhindere Größenanpassung an Inhalt
+	
+	self.gif_canvas = tk.Label(gif_canvas_frame, bg="#222", relief=tk.SUNKEN)
 	self.gif_canvas.pack(fill=tk.BOTH, expand=True)
 	self.tooltips['gif_canvas'] = ToolTip(self.gif_canvas, tr('tt_gif_canvas', self.lang))
+	
 	# Mouse-Binding für GIF-Vorschau: Bei Klick GIF neu anzeigen
 	def reload_gif_and_refresh_texture(event=None):
 		self.load_gif()
@@ -210,12 +396,20 @@ def build_layout(self):
 	# Rechte Seite: Textur
 	right = ttk.Frame(content)
 	right.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+	self.texture_preview_frame = right  # Referenz für Ein-/Ausblenden speichern
 	self.texture_label = ttk.Label(right, text="🖼 Textur-Vorschau", font=("Segoe UI", 12, "bold"))
 	self.texture_label.pack(pady=(0,5))
 	self.tooltips['texture_label'] = ToolTip(self.texture_label, tr('tt_texture_label', self.lang))
-	self.texture_canvas = tk.Label(right, bg="#222", width=40, height=16, relief=tk.SUNKEN)
+	
+	# Canvas-Container für quadratisches Aspekt-Verhältnis
+	texture_canvas_frame = tk.Frame(right, width=800, height=800, bg="#222")
+	texture_canvas_frame.pack(pady=(0, 10))
+	texture_canvas_frame.pack_propagate(False)  # Verhindere Größenanpassung an Inhalt
+	
+	self.texture_canvas = tk.Label(texture_canvas_frame, bg="#222", relief=tk.SUNKEN)
 	self.texture_canvas.pack(fill=tk.BOTH, expand=True)
 	self.tooltips['texture_canvas'] = ToolTip(self.texture_canvas, tr('tt_texture_canvas', self.lang))
+	
 	# Mouse-Binding für Textur-Vorschau: Bei Klick Textur neu generieren
 	def refresh_texture(event=None):
 		from image_processing import show_texture
@@ -227,24 +421,27 @@ def build_layout(self):
 
 	# --- Master Einstellungen ---
 	self.master_group = ttk.LabelFrame(main, text=f"🛠 {tr('master_settings', self.lang) or 'Master Einstellungen'}")
-	self.master_group.pack(fill=tk.X, padx=10, pady=(12,2))
+	self.master_group.pack(fill=tk.X, padx=10, pady=(5,2))
 
 	# --- Media ---
 	self.media_group = ttk.LabelFrame(main, text=f"🎬 {tr('media', self.lang) or 'Media'}")
-	self.media_group.pack(fill=tk.X, padx=10, pady=(12,2))
+	self.media_group.pack(fill=tk.X, padx=10, pady=(5,2))
 
-	# --- Datei-Gruppe ---
+	# --- Datei-Gruppe (File Group) ---
+	# Diese LabelFrame enthält die Haupt-Funktions-Toolbar (Load, Save, Export, etc.)
 	self.file_group = ttk.LabelFrame(main, text=f"📁 {tr('file', self.lang) or 'Datei'}")
-	self.file_group.pack(fill=tk.X, padx=10, pady=(12,2))
-	# --- Datei-Gruppe Controls ---
-
-	# Datei-Buttons: Laden, Speichern, Exportieren, Clear
+	self.file_group.pack(fill=tk.X, padx=10, pady=(5,2))
+	
 	try:
 		import ttkbootstrap as tb
 		THEME_AVAILABLE = True
 	except ImportError:
 		tb = None
 		THEME_AVAILABLE = False
+	
+	# === FILE TOOLBAR (Button-Leiste) ===
+	# Diese Buttons sind in der File-Group und bilden die Haupt-Funktions-Toolbar.
+	# Nicht zu verwechseln mit der Menu Bar (Menüleiste) oben im Fenster.
 	load_text = f"📂 {tr('load_gif', self.lang) or 'GIF laden'}"
 	if THEME_AVAILABLE and tb is not None:
 		self.load_btn = tb.Button(self.file_group, text=load_text, command=self.load_gif, bootstyle="success")
@@ -558,7 +755,7 @@ def build_layout(self):
 
 	# --- Status-Gruppe ---
 	self.status_group = ttk.LabelFrame(main, text=f"📋 {tr('status', self.lang) or 'Status'}")
-	self.status_group.pack(fill=tk.X, padx=10, pady=(12,8))
+	self.status_group.pack(fill=tk.X, padx=10, pady=(5,5))
 	self.status = ttk.Label(self.status_group, text=tr('ready', self.lang) or "Bereit", anchor="w")
 	self.status.pack(fill=tk.X)
 
