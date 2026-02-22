@@ -269,6 +269,9 @@ def load_gif_from_url(self: Any, image_url: Optional[str] = None) -> None:
 def _load_gif_frames(self: Any, file: str) -> None:
 	"""Lädt die Frames aus einer GIF-Datei und setzt gif_image, gif_frames, frame_count, current_frame."""
 	from PIL import UnidentifiedImageError
+	# Bei GIF-Ladevorgang auf GIF-Frames umschalten
+	self.texture_use_source_image = False
+	self.texture_source_image = None
 	frames = []
 	logger.info(f"Loading GIF file: {file}")
 	try:
@@ -407,6 +410,54 @@ def save_gif(self: Any) -> None:
 		logger.error(f"Error saving GIF {file}: {e}", exc_info=True)
 		messagebox.showerror("Fehler", f"Fehler beim Speichern des GIFs: {e}")
 		raise FileOperationError(f"Failed to save GIF: {str(e)}") from e
+
+def load_texture(self: Any) -> None:
+	"""Lädt eine Textur-Datei (PNG, JPG, BMP, etc.) und wendet alle Texture-Effekte an."""
+	filetypes = [
+		("Image files", "*.png *.jpg *.jpeg *.bmp *.tiff"),
+		("PNG files", "*.png"),
+		("JPEG files", "*.jpg *.jpeg"),
+		("BMP files", "*.bmp"),
+		("TIFF files", "*.tiff"),
+		("All files", "*.*")
+	]
+	
+	file = filedialog.askopenfilename(
+		title=tr('load_texture', self.lang) or "Textur laden",
+		filetypes=filetypes
+	)
+	
+	if not file:
+		return
+	
+	try:
+		logger.info(f"Loading texture from: {file}")
+		img = Image.open(file)
+		
+		# Konvertiere zu RGBA
+		if img.mode != 'RGBA':
+			img = img.convert('RGBA')
+		
+		# Speichere als Textur-Quelle und nutze sie für Vorschau/Export (ohne GIF-Frames zu überschreiben)
+		self.texture_source_image = img
+		self.texture_use_source_image = True
+		self.texture_image = img
+		logger.info(f"Texture loaded: {img.size}")
+		
+		# Zeige die Textur mit allen Texture-Einstellungen (Effekte, Größe, etc.)
+		from image_processing import show_texture
+		show_texture(self)
+		
+		if hasattr(self, 'status') and self.status:
+			self.status.config(
+				text=f"{tr('texture_loaded', self.lang) or 'Textur geladen'}: {os.path.basename(file)} ({tr('size', self.lang) or 'Größe'}: {img.size[0]}x{img.size[1]})"
+			)
+	except Exception as e:
+		logger.error(f"Error loading texture: {e}", exc_info=True)
+		if hasattr(self, 'status') and self.status:
+			self.status.config(
+				text=f"{tr('error_loading_texture', self.lang) or 'Fehler beim Laden der Textur'}: {str(e)}"
+			)
 
 def save_texture(self: Any) -> None:
 	"""Speichert die aktuell generierte Texture."""

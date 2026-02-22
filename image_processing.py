@@ -417,7 +417,15 @@ def _process_texture_worker(self: ModernAppProtocol) -> None:
 
 		# Sheet erzeugen
 		try:
-			if not self.gif_frames:
+			use_source_image = getattr(self, 'texture_use_source_image', False)
+			source_image = getattr(self, 'texture_source_image', None)
+			if use_source_image and source_image is not None:
+				# Direkt geladene Textur verwenden (Effekte anwenden)
+				sheet = source_image
+				if sheet.mode != "RGBA":
+					sheet = sheet.convert("RGBA")
+				sheet = apply_effects(self, sheet, prefix="texture")
+			elif not self.gif_frames:
 				sheet = Image.new("RGBA", (tex_w, tex_h), bg_rgba)
 			else:
 				# INTELLIGENTE SKALIERUNG: Arbeitsbild für Vorschau (SCHNELL!)

@@ -4,6 +4,7 @@
 # OSSL2Gif OSSL2Gif Version 2.0.0 © 2026 by Manfred Zainhofer
 ###
 
+import re
 import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageDraw, ImageTk
@@ -13,6 +14,10 @@ from logging_config import get_logger
 from events import reset_settings
 
 logger = get_logger(__name__)
+
+def normalize_label_text(text: str) -> str:
+	"""Collapse any whitespace to single spaces for consistent labels."""
+	return re.sub(r"\s+", " ", text, flags=re.UNICODE).strip()
 
 def create_menubar(self):
 	"""Erstellt die Menu Bar (Menüleiste) oben im Fenster.
@@ -39,19 +44,23 @@ def create_menubar(self):
 	# Datei-Menü
 	file_menu = tk.Menu(menubar, tearoff=0)
 	file_menu.config(bg='#2d2d2d', fg='#ffffff', activebackground='#4a4a4a', activeforeground='#ffffff')  # type: ignore
-	file_menu.add_command(label=f"📂 {tr('load_gif', self.lang) or 'GIF laden'}", command=self.load_gif, accelerator="Strg+O")
-	file_menu.add_command(label=f"🌐 {tr('load_url', self.lang) or 'URL laden'}", command=self.load_gif_from_url, accelerator="Strg+U")
-	file_menu.add_command(label=f"📋 {tr('load_clipboard', self.lang) or 'Aus Zwischenablage'}", command=self.load_gif_from_clipboard, accelerator="Strg+V")
+	file_menu.add_command(label=f"📂 {tr('load_gif', self.lang) or 'GIF laden'}", command=self.load_gif, accelerator=f"{tr('key_ctrl', self.lang) or 'Strg'}+O")
+	file_menu.add_command(label=f"🌐 {tr('load_url', self.lang) or 'URL laden'}", command=self.load_gif_from_url, accelerator=f"{tr('key_ctrl', self.lang) or 'Strg'}+U")
+	file_menu.add_command(label=f"📋 {tr('load_clipboard', self.lang) or 'Aus Zwischenablage'}", command=self.load_gif_from_clipboard, accelerator=f"{tr('key_ctrl', self.lang) or 'Strg'}+V")
+	file_menu.add_separator()
+	file_menu.add_command(label=normalize_label_text(f"🖼 {tr('load_texture', self.lang) or 'Textur laden'}"), command=self.load_texture)
 	file_menu.add_separator()
 	file_menu.add_command(label=f"🧩 {tr('import_frames', self.lang) or 'Bilder zu GIF'}", command=self.import_frames_to_gif)
 	file_menu.add_separator()
-	file_menu.add_command(label=f"💾 {tr('save_gif', self.lang) or 'GIF speichern'}", command=self.save_gif, accelerator="Strg+S")
-	file_menu.add_command(label=f"🧵 {tr('save_texture', self.lang) or 'Textur speichern'}", command=self.save_texture, accelerator="Strg+T")
-	file_menu.add_command(label=f"🧾 {tr('export_lsl', self.lang) or 'LSL exportieren'}", command=self.export_lsl, accelerator="Strg+E")
+	file_menu.add_command(label=f"💾 {tr('save_gif', self.lang) or 'GIF speichern'}", command=self.save_gif, accelerator=f"{tr('key_ctrl', self.lang) or 'Strg'}+S")
+	file_menu.add_command(label=f"🧵 {tr('save_texture', self.lang) or 'Textur speichern'}", command=self.save_texture, accelerator=f"{tr('key_ctrl', self.lang) or 'Strg'}+T")
+	file_menu.add_command(label=f"🧾 {tr('export_lsl', self.lang) or 'LSL exportieren'}", command=self.export_lsl, accelerator=f"{tr('key_ctrl', self.lang) or 'Strg'}+E")
+	file_menu.add_separator()
+	file_menu.add_command(label=f"💾 {tr('save_settings', self.lang) or 'Einstellungen speichern'}", command=self.save_gui_config)
 	file_menu.add_separator()
 	file_menu.add_command(label=f"🧹 {tr('clear', self.lang) or 'Löschen'}", command=self.clear_texture)
 	file_menu.add_separator()
-	file_menu.add_command(label=f"{tr('exit', self.lang) or 'Beenden'}", command=self.root.quit, accelerator="Strg+Q")
+	file_menu.add_command(label=f"{tr('exit', self.lang) or 'Beenden'}", command=self.root.quit, accelerator=f"{tr('key_ctrl', self.lang) or 'Strg'}+Q")
 	menubar.add_cascade(label=f"📁 {tr('file', self.lang) or 'Datei'}", menu=file_menu)
 	
 	# Bearbeiten-Menü
@@ -133,21 +142,30 @@ def create_menubar(self):
 	edit_menu.add_cascade(label=f"📤 {tr('export_format', self.lang) or 'Exportformat'}", menu=export_format_submenu)
 	
 	edit_menu.add_separator()
-	edit_menu.add_command(label=f"🔄 {tr('reset', self.lang) or 'Zurücksetzen'}", command=lambda: reset_settings(self), accelerator="Strg+R")
+	edit_menu.add_command(label=f"🔄 {tr('reset', self.lang) or 'Zurücksetzen'}", command=lambda: reset_settings(self), accelerator=f"{tr('key_ctrl', self.lang) or 'Strg'}+R")
 	menubar.add_cascade(label=f"✏ {tr('edit', self.lang) or 'Bearbeiten'}", menu=edit_menu)
 	
 	# Ansicht-Menü
 	view_menu = tk.Menu(menubar, tearoff=0)
 	view_menu.config(bg='#2d2d2d', fg='#ffffff', activebackground='#4a4a4a', activeforeground='#ffffff')  # type: ignore
-	view_menu.add_command(label=f"▶ {tr('play', self.lang) or 'Abspielen'}", command=self.start_animation, accelerator="Leertaste")
-	view_menu.add_command(label=f"⏸ {tr('pause', self.lang) or 'Pause'}", command=self.pause_animation)
-	view_menu.add_command(label=f"⏹ {tr('stop', self.lang) or 'Stop'}", command=self.stop_animation)
+	view_menu.add_command(label=tr('scene_standard', self.lang) or 'Standard', command=lambda: self._apply_view_preset('standard'))
+	view_menu.add_command(label=tr('scene_media_player', self.lang) or 'Mediaplayer', command=lambda: self._apply_view_preset('media_player'))
+	view_menu.add_command(label=tr('scene_gif_edit', self.lang) or 'GIF-Bearbeitung', command=lambda: self._apply_view_preset('gif_edit'))
+	view_menu.add_command(label=tr('scene_texture_edit', self.lang) or 'Textur-Bearbeitung', command=lambda: self._apply_view_preset('texture_edit'))
 	view_menu.add_separator()
-	view_menu.add_command(label=f"⏮ {tr('prev_frame', self.lang) or 'Zurück'}", command=self.step_backward, accelerator="←")
-	view_menu.add_command(label=f"⏭ {tr('next_frame', self.lang) or 'Vor'}", command=self.step_forward, accelerator="→")
-	view_menu.add_separator()
-	view_menu.add_command(label=f"🎬 {tr('texture_preview_sl', self.lang) or 'Textur-Vorschau (SL/OpenSim)'}", command=self.show_texture_preview_window, accelerator="Strg+P")
+	view_menu.add_command(label=f"🎬 {tr('texture_preview_sl', self.lang) or 'Textur-Vorschau (SL/OpenSim)'}", command=self.show_texture_preview_window, accelerator=f"{tr('key_ctrl', self.lang) or 'Strg'}+P")
 	menubar.add_cascade(label=f"👁 {tr('view', self.lang) or 'Ansicht'}", menu=view_menu)
+
+	# Media-Menü
+	media_menu = tk.Menu(menubar, tearoff=0)
+	media_menu.config(bg='#2d2d2d', fg='#ffffff', activebackground='#4a4a4a', activeforeground='#ffffff')  # type: ignore
+	media_menu.add_command(label=f"▶ {tr('play', self.lang) or 'Abspielen'}", command=self.start_animation, accelerator=tr('key_space', self.lang) or 'Leertaste')
+	media_menu.add_command(label=f"⏸ {tr('pause', self.lang) or 'Pause'}", command=self.pause_animation)
+	media_menu.add_command(label=f"⏹ {tr('stop', self.lang) or 'Stop'}", command=self.stop_animation)
+	media_menu.add_separator()
+	media_menu.add_command(label=f"⏮ {tr('prev_frame', self.lang) or 'Zurück'}", command=self.step_backward, accelerator=tr('key_left', self.lang) or '←')
+	media_menu.add_command(label=f"⏭ {tr('next_frame', self.lang) or 'Vor'}", command=self.step_forward, accelerator=tr('key_right', self.lang) or '→')
+	menubar.add_cascade(label=f"🎬 {tr('media', self.lang) or 'Media'}", menu=media_menu)
 	
 	# Gruppen-Menü
 	groups_menu = tk.Menu(menubar, tearoff=0)
@@ -155,9 +173,15 @@ def create_menubar(self):
 	groups_menu.add_checkbutton(label=f"🎞 {tr('show_gif_preview', self.lang) or 'GIF-Vorschau anzeigen'}", 
 	                           variable=self.show_gif_var, 
 	                           command=self._toggle_gif_preview)
+	groups_menu.add_checkbutton(label=f"⚙ {tr('show_gif_settings', self.lang) or 'GIF-Einstellungen anzeigen'}", 
+	                           variable=self.show_gif_settings_var, 
+	                           command=self._toggle_gif_settings)
 	groups_menu.add_checkbutton(label=f"🖼 {tr('show_texture_preview', self.lang) or 'Textur-Vorschau anzeigen'}", 
 	                           variable=self.show_texture_var, 
 	                           command=self._toggle_texture_preview)
+	groups_menu.add_checkbutton(label=f"⚙ {tr('show_texture_settings', self.lang) or 'Textur-Einstellungen anzeigen'}", 
+	                           variable=self.show_texture_settings_var, 
+	                           command=self._toggle_texture_settings)
 	groups_menu.add_separator()
 	groups_menu.add_checkbutton(label=f"🛠 {tr('show_master_settings', self.lang) or 'Master-Einstellungen anzeigen'}", 
 	                           variable=self.show_master_var, 
@@ -361,6 +385,7 @@ def build_layout(self):
 	main.pack(fill=tk.BOTH, expand=True)
 	content = ttk.Frame(main)
 	content.pack(fill=tk.BOTH, expand=True)
+	self.content_frame = content
 	content.columnconfigure(0, weight=1)
 	content.columnconfigure(1, weight=1)
 	content.rowconfigure(0, weight=1)
@@ -368,14 +393,16 @@ def build_layout(self):
 	# Linke Seite: GIF
 	left = ttk.Frame(content)
 	left.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-	self.gif_preview_frame = left  # Referenz für Ein-/Ausblenden speichern
-	self.gif_label = ttk.Label(left, text="🎞 GIF-Vorschau", font=("Segoe UI", 12, "bold"))
+	gif_preview_container = ttk.Frame(left)
+	gif_preview_container.pack(fill=tk.BOTH, expand=True)
+	self.gif_preview_frame = gif_preview_container  # Referenz für Ein-/Ausblenden speichern
+	self.gif_label = ttk.Label(gif_preview_container, text="🎞 GIF-Vorschau", font=("Segoe UI", 12, "bold"))
 	self.gif_label.pack(pady=(0,5))
 	self.tooltips = {}
 	self.tooltips['gif_label'] = ToolTip(self.gif_label, tr('tt_gif_label', self.lang))
 	
 	# Canvas-Container für quadratisches Aspekt-Verhältnis
-	gif_canvas_frame = tk.Frame(left, width=800, height=800, bg="#222")
+	gif_canvas_frame = tk.Frame(gif_preview_container, width=800, height=800, bg="#222")
 	gif_canvas_frame.pack(pady=(0, 10))
 	gif_canvas_frame.pack_propagate(False)  # Verhindere Größenanpassung an Inhalt
 	
@@ -396,13 +423,15 @@ def build_layout(self):
 	# Rechte Seite: Textur
 	right = ttk.Frame(content)
 	right.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
-	self.texture_preview_frame = right  # Referenz für Ein-/Ausblenden speichern
-	self.texture_label = ttk.Label(right, text="🖼 Textur-Vorschau", font=("Segoe UI", 12, "bold"))
+	texture_preview_container = ttk.Frame(right)
+	texture_preview_container.pack(fill=tk.BOTH, expand=True)
+	self.texture_preview_frame = texture_preview_container  # Referenz für Ein-/Ausblenden speichern
+	self.texture_label = ttk.Label(texture_preview_container, text="🖼 Textur-Vorschau", font=("Segoe UI", 12, "bold"))
 	self.texture_label.pack(pady=(0,5))
 	self.tooltips['texture_label'] = ToolTip(self.texture_label, tr('tt_texture_label', self.lang))
 	
 	# Canvas-Container für quadratisches Aspekt-Verhältnis
-	texture_canvas_frame = tk.Frame(right, width=800, height=800, bg="#222")
+	texture_canvas_frame = tk.Frame(texture_preview_container, width=800, height=800, bg="#222")
 	texture_canvas_frame.pack(pady=(0, 10))
 	texture_canvas_frame.pack_propagate(False)  # Verhindere Größenanpassung an Inhalt
 	
@@ -410,11 +439,10 @@ def build_layout(self):
 	self.texture_canvas.pack(fill=tk.BOTH, expand=True)
 	self.tooltips['texture_canvas'] = ToolTip(self.texture_canvas, tr('tt_texture_canvas', self.lang))
 	
-	# Mouse-Binding für Textur-Vorschau: Bei Klick Textur neu generieren
-	def refresh_texture(event=None):
-		from image_processing import show_texture
-		show_texture(self)
-	self.texture_canvas.bind('<Button-1>', refresh_texture)
+	# Mouse-Binding für Textur-Vorschau: Bei Klick Textur laden
+	def load_texture_on_click(event=None):
+		self.load_texture()
+	self.texture_canvas.bind('<Button-1>', load_texture_on_click)
 	self.texture_settings = self.create_effects_panel(right, prefix="texture")
 	self.texture_settings.pack(fill=tk.X, pady=10)
 	self.tooltips['texture_settings'] = ToolTip(self.texture_settings, tr('tt_texture_settings', self.lang))
@@ -455,6 +483,9 @@ def build_layout(self):
 	self.save_gif_btn = ttk.Button(self.file_group, text=f"💾 {tr('save_gif', self.lang) or 'GIF speichern'}", command=self.save_gif)
 	self.save_gif_btn.pack(side=tk.LEFT, padx=2, pady=2)
 	self.tooltips['save_gif_btn'] = ToolTip(self.save_gif_btn, tr('tt_save_gif_btn', self.lang))
+	self.load_texture_btn = ttk.Button(self.file_group, text=normalize_label_text(f"🖼 {tr('load_texture', self.lang) or 'Textur laden'}"), command=self.load_texture)
+	self.load_texture_btn.pack(side=tk.LEFT, padx=2, pady=2)
+	self.tooltips['load_texture_btn'] = ToolTip(self.load_texture_btn, tr('tt_load_texture_btn', self.lang) or "Textur-Datei laden (PNG, JPG, BMP, etc.)")
 	self.save_texture_btn = ttk.Button(self.file_group, text=f"🧵 {tr('save_texture', self.lang) or 'Textur speichern'}", command=self.save_texture)
 	self.save_texture_btn.pack(side=tk.LEFT, padx=2, pady=2)
 	self.tooltips['save_texture_btn'] = ToolTip(self.save_texture_btn, tr('tt_save_texture_btn', self.lang))

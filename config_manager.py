@@ -59,10 +59,14 @@ class ConfigManager:
 		# Bildgröße und Layout
 		'texture_width': (2048, int, 256, 8192),
 		'texture_height': (2048, int, 256, 8192),
+		'width': (2048, int, 256, 8192),  # Alias für texture_width
+		'height': (2048, int, 256, 8192),  # Alias für texture_height
 		
 		# Frame-Management
 		'max_frames': (64, int, 1, 256),
 		'default_framerate': (10, int, 1, 60),
+		'framerate': (10, int, 1, 60),  # Alias für default_framerate
+		'maxframes': (64, int, 1, 256),  # Alias für max_frames
 		
 		# Effekte - Standardwerte
 		'effect_sharpen_default': (2.5, float, 0.0, 10.0),
@@ -70,18 +74,33 @@ class ConfigManager:
 		'effect_transparency_default': (0.5, float, 0.0, 1.0),
 		'effect_colorintensity_default': (0.5, float, 0.0, 1.0),
 		
-		# UI
+		# UI - Window-Geometrie
 		'window_width': (1500, int, 800, 2048),
 		'window_height': (1550, int, 600, 2048),
+		'window_geometry': ('', str, None, None),  # Format: "WxH+X+Y" (z.B. "1200x800+100+50")
 		'checkerboard_size': (32, int, 8, 64),
 		'checkerboard_checker_size': (4, int, 2, 16),
 		
-		# Sprache
+		# Sprache und Farbe
 		'language': ('de', str, None, None),
-		'supported_languages': (['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt'], list, None, None),
+		'lang': ('de', str, None, None),  # Alias für language
+		'supported_languages': (['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt', 'uk', 'ja', 'zh'], list, None, None),
+		'bg_color': ('#00000000', str, None, None),  # Hintergrundfarbe
+		'theme': (None, str, None, None),  # UI-Theme
+		
+		# Gruppen-Sichtbarkeit
+		'show_gif_preview': (True, bool, None, None),
+		'show_gif_settings': (True, bool, None, None),
+		'show_texture_preview': (True, bool, None, None),
+		'show_texture_settings': (True, bool, None, None),
+		'show_master_settings': (True, bool, None, None),
+		'show_media': (True, bool, None, None),
+		'show_file': (True, bool, None, None),
+		'show_status': (True, bool, None, None),
 		
 		# Export
 		'default_export_format': ('PNG', str, None, None),
+		'export_format': ('PNG', str, None, None),  # Alias für default_export_format
 		'supported_export_formats': (['PNG', 'DDS', 'JPG', 'BMP'], list, None, None),
 		
 		# System
@@ -89,7 +108,6 @@ class ConfigManager:
 		'log_level': ('INFO', str, None, None),
 		'enable_debug_logging': (False, bool, None, None),
 	}
-	
 	def __init__(self):
 		"""Initialisiert den ConfigManager mit Standard-Werten"""
 		self._values: Dict[str, ConfigValue] = {}

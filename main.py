@@ -13,9 +13,9 @@ import logging
 from typing import Optional, List, Any
 from config import load_config, save_config
 from translations import tr
-from gui_layout import build_layout, create_effects_panel
+from gui_layout import build_layout, create_effects_panel, normalize_label_text
 from image_processing import apply_effects, show_gif_frame, show_texture
-from file_ops import load_gif, save_gif, save_texture, export_lsl, generate_lsl_script
+from file_ops import load_gif, save_gif, save_texture, load_texture, export_lsl, generate_lsl_script
 from events import reset_settings, change_language, on_maxframes_changed, add_selected_frame_to_texture, choose_bg_color, set_transparent_bg, on_bg_transparency_changed, apply_background_from_config
 from logging_config import get_logger
 try:
@@ -84,7 +84,7 @@ except Exception as e:
     DEFAULT_LANGUAGE = 'unknown'
 
 LANGUAGES = ['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt', 'uk', 'ja', 'zh']
-Version = "2.1.0"
+Version = "2.1.1"
 WindowsSize  = "1650x950"
 
 class ModernApp:
@@ -187,6 +187,8 @@ class ModernApp:
         self.gif_image: Optional[Image.Image] = None
         self.gif_frames: List[Image.Image] = []
         self.texture_image: Optional[Image.Image] = None
+        self.texture_source_image: Optional[Image.Image] = None
+        self.texture_use_source_image: bool = False
         self.frame_count: int = 0
         self.current_frame: int = 0
         self.timer: Optional[Any] = None
@@ -239,6 +241,7 @@ class ModernApp:
         self.height_var = tk.IntVar(value=2048)
         self.load_btn = None
         self.load_url_btn = None
+        self.load_texture_btn = None
         self.remove_frame_btn = None  # Für Entfernen-Button (Frames)
         self.save_gif_btn = None
         self.save_texture_btn = None
@@ -284,7 +287,9 @@ class ModernApp:
         
         # BooleanVars für Gruppen-Sichtbarkeit
         self.show_gif_var = tk.BooleanVar(value=True)
+        self.show_gif_settings_var = tk.BooleanVar(value=True)
         self.show_texture_var = tk.BooleanVar(value=True)
+        self.show_texture_settings_var = tk.BooleanVar(value=True)
         self.show_master_var = tk.BooleanVar(value=True)
         self.show_media_var = tk.BooleanVar(value=True)
         self.show_file_var = tk.BooleanVar(value=True)
@@ -306,25 +311,74 @@ class ModernApp:
         # Konfiguration laden (vor build_layout, damit Werte übernommen werden)
         self._config_loaded = False
         config = load_config()
+        
+        # Debug-Logging für Config-Laden
+        if config:
+            logger.debug(f"Configuration loaded: {list(config.keys())}")
+        else:
+            logger.debug("No configuration file found - using defaults")
+        
+        # Sprache VORHER aus Config laden, damit build_layout() mit der richtigen Sprache arbeitet
+        if config and 'lang' in config:
+            self.lang = config['lang']
+            logger.debug(f"Language loaded from config: {self.lang}")
+        
+        # Gruppen-Einstellungen aus Config laden, falls vorhanden
+        if config:
+            group_settings_loaded = False
+            if 'show_gif_preview' in config:
+                self.show_gif_var.set(config['show_gif_preview'])
+                group_settings_loaded = True
+            if 'show_gif_settings' in config:
+                self.show_gif_settings_var.set(config['show_gif_settings'])
+                group_settings_loaded = True
+            if 'show_texture_preview' in config:
+                self.show_texture_var.set(config['show_texture_preview'])
+                group_settings_loaded = True
+            if 'show_texture_settings' in config:
+                self.show_texture_settings_var.set(config['show_texture_settings'])
+                group_settings_loaded = True
+            if 'show_master_settings' in config:
+                self.show_master_var.set(config['show_master_settings'])
+                group_settings_loaded = True
+            if 'show_media' in config:
+                self.show_media_var.set(config['show_media'])
+                group_settings_loaded = True
+            if 'show_file' in config:
+                self.show_file_var.set(config['show_file'])
+                group_settings_loaded = True
+            if 'show_status' in config:
+                self.show_status_var.set(config['show_status'])
+                group_settings_loaded = True
+            if group_settings_loaded:
+                logger.debug("Group visibility settings loaded from config")
         self.build_layout()
         # Nach build_layout ist self.lang_var gesetzt
         if hasattr(self, 'lang_var') and self.lang_var is not None:
+            self.lang_var.set(self.lang)  # Setze lang_var auf den geladenen Sprachcode
             self.lang = self.lang_var.get()
         # ZUERST die Sprache aktualisieren, damit die Textlängen korrekt sind
         self.update_language()
         # DANN alle Größen berechnen, NACHDEM die Texte gesetzt sind
         self.root.update_idletasks()
-        # Fenstergeometrie nach build_layout() und update_language() optimieren
-        self._optimize_window_size()
-        # Fenstergröße aus config laden, aber nicht kleiner als die optimierte Größe
+        
+        # Konfiguration anwenden (PRIOITÄT: Config vor _optimize_window_size)
         if config:
             self.apply_config(config)
             self._config_loaded = True
+        else:
+            # Nur optimieren, wenn KEINE config vorhanden ist
+            self._optimize_window_size()
         self._setup_drag_and_drop()
         # Bindings für Effekte-Panels IMMER setzen
         self._bind_effects_panel_events()
-        # Beim Beenden speichern
-        atexit.register(self.save_config)
+        # Hinweis: Automatisches Speichern beim Beenden ist deaktiviert.
+        # Verwenden Sie stattdessen 'Datei > Einstellungen speichern' um Einstellungen manuell zu speichern.
+        
+        # Fenster aktualisieren und anzeigen
+        self.root.update()
+        self.root.deiconify()  # Zeige Fenster an (es wurde mit withdraw() versteckt)
+        logger.info("Application window displayed")
 
         # --- Event-Bindings zentral setzen ---
         # Entfernen-Button für Frames verbinden
@@ -441,8 +495,8 @@ class ModernApp:
 
     def get_config(self):
         # Alle relevanten Einstellungen als dict zurückgeben
-        window_width = self.root.winfo_width()
-        window_height = self.root.winfo_height()
+        # Windowgeometrie speichern: z.B. "1200x800+100+50"
+        window_geometry = self.root.geometry()
         return {
             'lang': self.lang,
             'width': self.width_var.get() if hasattr(self, 'width_var') and self.width_var is not None else 2048,
@@ -452,14 +506,36 @@ class ModernApp:
             'export_format': self.export_format_var.get() if hasattr(self, 'export_format_var') and self.export_format_var is not None else 'PNG',
             'maxframes': self.maxframes_var.get() if hasattr(self, 'maxframes_var') and self.maxframes_var is not None else 64,
             'theme': self.theme_var.get() if hasattr(self, 'theme_var') and self.theme_var is not None else None,
-            'window_width': window_width,
-            'window_height': window_height
+            'window_geometry': window_geometry,
+            'show_gif_preview': self.show_gif_var.get(),
+            'show_gif_settings': self.show_gif_settings_var.get(),
+            'show_texture_preview': self.show_texture_var.get(),
+            'show_texture_settings': self.show_texture_settings_var.get(),
+            'show_master_settings': self.show_master_var.get(),
+            'show_media': self.show_media_var.get(),
+            'show_file': self.show_file_var.get(),
+            'show_status': self.show_status_var.get()
         }
 
     def save_config(self):
         save_config(self)
 
+    def save_gui_config(self):
+        """Speichert die aktuellen GUI-Einstellungen manuell (inkl. Gruppen-Sichtbarkeit)."""
+        self.save_config()
+        messagebox.showinfo(tr('save_settings', self.lang) or 'Einstellungen speichern', 
+                           f"{tr('save_settings', self.lang) or 'Einstellungen'} {tr('ready', self.lang) or 'gespeichert'}!")
+
     def apply_config(self, config):
+        """Wendet die Konfiguration auf die GUI an.
+        
+        HINWEIS: Gruppen-Einstellungen und Sprache werden bereits VORHER geladen.
+        Diese Methode wendet nur die restlichen Einstellungen an (Größen, Theme, etc.)
+        """
+        logger.debug(f"Applying configuration with keys: {list(config.keys())}")
+        
+        window_geometry_restored = False
+        
         if 'theme' in config and hasattr(self, 'theme_var') and self.theme_var is not None:
             self.theme_var.set(config['theme'])
             # Theme auch auf ttkbootstrap anwenden, falls verfügbar
@@ -471,10 +547,8 @@ class ModernApp:
                 logger.warning(f"Theme configuration key missing: {e}", exc_info=False)
             except Exception as e:
                 logger.warning(f"Failed to apply theme from config: {type(e).__name__}: {e}", exc_info=False)
+        
         # Werte aus config dict auf GUI anwenden
-        if 'lang' in config and self.lang_var is not None:
-            self.lang_var.set(config['lang'])
-            self.lang = config['lang']
         if 'width' in config:
             self.width_var.set(config['width'])
             if hasattr(self, 'size_preset_var') and self.size_preset_var is not None:
@@ -490,17 +564,33 @@ class ModernApp:
         if 'maxframes' in config:
             self.maxframes_var.set(config['maxframes'])
         
-        # Fenstergröße wiederherstellen, falls in config gespeichert
-        if 'window_width' in config and 'window_height' in config:
+        # Fenster-Geometrie aus config wiederherstellen (z.B. "1200x800+100+50")
+        if 'window_geometry' in config and config['window_geometry']:
+            try:
+                geometry = config['window_geometry']
+                self.root.geometry(geometry)
+                window_geometry_restored = True
+                logger.debug(f"Restored window geometry from config: {geometry}")
+            except Exception as e:
+                logger.warning(f"Failed to restore window geometry '{config['window_geometry']}': {e}", exc_info=False)
+        elif 'window_width' in config and 'window_height' in config:
+            # Fallback für ältere configs (mit separaten width/height)
             window_width = config['window_width']
             window_height = config['window_height']
-            if window_width > 0 and window_height > 0:
+            if window_width > 1000 and window_height > 600:  # Sanity check, nur wenn sinnvolle Größen
                 # Zentriere das Fenster auf dem Bildschirm
                 screen_width = self.root.winfo_screenwidth()
                 screen_height = self.root.winfo_screenheight()
                 x = (screen_width // 2) - (window_width // 2)
                 y = (screen_height // 2) - (window_height // 2)
                 self.root.geometry(f'{window_width}x{window_height}+{x}+{y}')
+                window_geometry_restored = True
+                logger.debug(f"Restored window size from config (fallback): {window_width}x{window_height}")
+        
+        # Wenn KEINE gespeicherte Fenster-Geometrie gefunden, optimiere die Größe
+        if not window_geometry_restored:
+            logger.debug("No window geometry in config, optimizing window size")
+            self._optimize_window_size()
 
         # Für Pylance: Initialisiere dynamisch gesetzte GUI-Attribute
         self.gif_label = getattr(self, 'gif_label', None)
@@ -512,8 +602,26 @@ class ModernApp:
         self.texture_canvas = getattr(self, 'texture_canvas', None)
         self.gif_canvas = getattr(self, 'gif_canvas', None)
         self.file_group = getattr(self, 'file_group', None)
+        
+        # Wende die geladenen Gruppen-Sichtbarkeitseinstellungen auf die GUI an
+        self._apply_group_visibility()
+        
         # Nach dem Anwenden der Config: Effekt-Panel-Bindings erneut setzen
         self._bind_effects_panel_events()
+
+    def _apply_group_visibility(self):
+        """Wendet die geladenen Gruppen-Sichtbarkeitseinstellungen auf die GUI an.
+        Dies wird beim Start aufgerufen, nachdem die Config geladen wurde."""
+        logger.debug("Applying group visibility settings from config")
+        
+        # Lade und wende jeden Group-Visibilität-Toggle an
+        self._toggle_gif_preview()
+        self._toggle_gif_settings()
+        self._toggle_texture_preview()
+        self._toggle_texture_settings()
+        self._repack_groups()
+        
+        logger.debug("Group visibility settings applied")
 
     def _optimize_window_size(self):
         """Passt die Fenstergeometrie automatisch an den Inhalt an."""
@@ -521,6 +629,7 @@ class ModernApp:
             # Berechne erforderliche Größe
             req_width = self.root.winfo_reqwidth()
             req_height = self.root.winfo_reqheight()
+            logger.debug(f"Window requested size: {req_width}x{req_height}")
             
             # Multiplier basierend auf Sprache: Längere Sprachen brauchen mehr Platz
             lang_multipliers = {
@@ -549,6 +658,7 @@ class ModernApp:
             # Begrenze die Größe auf den verfügbaren Bildschirmbereich
             screen_width = self.root.winfo_screenwidth()
             screen_height = self.root.winfo_screenheight()
+            logger.debug(f"Screen size: {screen_width}x{screen_height}")
             
             # Verwende max. 90% des Bildschirms, aber mind. 1300x900
             max_width = int(screen_width * 0.9)
@@ -562,10 +672,12 @@ class ModernApp:
             y = (screen_height // 2) - (window_height // 2)
             
             self.root.geometry(f'{window_width}x{window_height}+{x}+{y}')
+            logger.info(f"Window optimized to size: {window_width}x{window_height} at position +{x}+{y}")
         except Exception as e:
-            logger.debug(f"Could not optimize window size: {e}", exc_info=False)
+            logger.error(f"Could not optimize window size: {e}", exc_info=True)
             # Fallback auf Standard-Größe
             self.root.geometry(WindowsSize)
+            logger.info(f"Fallback to default window size: {WindowsSize}")
 
     def build_layout(self):
         build_layout(self)
@@ -735,6 +847,10 @@ class ModernApp:
             self.save_gif_btn.config(text=f"💾 {tr('save_gif', l) or ''}")
         if self.save_texture_btn is not None:
             self.save_texture_btn.config(text=f"🧵 {tr('save_texture', l) or ''}")
+        if hasattr(self, 'load_texture_btn') and self.load_texture_btn is not None:
+            self.load_texture_btn.config(text=normalize_label_text(f"🖼 {tr('load_texture', l) or 'Textur laden'}"))
+        if 'load_texture_btn' in self.tooltips:
+            self.tooltips['load_texture_btn'].set_text(tr('tt_load_texture_btn', l) or "Textur-Datei laden (PNG, JPG, BMP, etc.)")
         if self.export_lsl_btn is not None:
             self.export_lsl_btn.config(text=f"🧾 {tr('export_lsl', l) or ''}")
         if self.status is not None:
@@ -837,6 +953,12 @@ class ModernApp:
         self._ensure_file_ops_methods()
         from file_ops import load_gif_compat
         load_gif_compat(self)
+
+    def load_texture(self):
+        """Lädt eine Textur-Datei."""
+        self._ensure_file_ops_methods()
+        from file_ops import load_texture
+        load_texture(self)
 
     def load_gif_from_clipboard(self, event=None):
         self._ensure_file_ops_methods()
@@ -1103,17 +1225,125 @@ Python {'.'.join(map(str, __import__('sys').version_info[:3]))}
         """Toggle GIF-Vorschau ein/aus."""
         if self.gif_preview_frame is not None:
             if self.show_gif_var.get():
-                self.gif_preview_frame.grid()
+                self.gif_preview_frame.pack(fill=tk.BOTH, expand=True)
             else:
-                self.gif_preview_frame.grid_remove()
+                self.gif_preview_frame.pack_forget()
+        self._adjust_window_size_to_content()
     
     def _toggle_texture_preview(self):
         """Toggle Textur-Vorschau ein/aus."""
         if self.texture_preview_frame is not None:
             if self.show_texture_var.get():
-                self.texture_preview_frame.grid()
+                self.texture_preview_frame.pack(fill=tk.BOTH, expand=True)
             else:
-                self.texture_preview_frame.grid_remove()
+                self.texture_preview_frame.pack_forget()
+        self._adjust_window_size_to_content()
+
+    def _toggle_gif_settings(self):
+        """Toggle GIF-Einstellungen ein/aus."""
+        if self.gif_settings is not None:
+            if self.show_gif_settings_var.get():
+                self.gif_settings.pack(fill=tk.X, pady=10)
+            else:
+                self.gif_settings.pack_forget()
+        self._adjust_window_size_to_content()
+
+    def _toggle_texture_settings(self):
+        """Toggle Textur-Einstellungen ein/aus."""
+        if self.texture_settings is not None:
+            if self.show_texture_settings_var.get():
+                self.texture_settings.pack(fill=tk.X, pady=10)
+            else:
+                self.texture_settings.pack_forget()
+        self._adjust_window_size_to_content()
+
+    def _apply_view_preset(self, preset_name):
+        """Wendet eine Schnellauswahl für die Sichtbarkeit von Gruppen an."""
+        presets = {
+            'standard': {
+                'show_gif_var': True,
+                'show_gif_settings_var': True,
+                'show_texture_var': True,
+                'show_texture_settings_var': True,
+                'show_master_var': True,
+                'show_media_var': True,
+                'show_file_var': True,
+                'show_status_var': True,
+            },
+            'media_player': {
+                'show_gif_var': True,
+                'show_gif_settings_var': False,
+                'show_texture_var': False,
+                'show_texture_settings_var': False,
+                'show_master_var': False,
+                'show_media_var': True,
+                'show_file_var': False,
+                'show_status_var': True,
+            },
+            'gif_edit': {
+                'show_gif_var': True,
+                'show_gif_settings_var': True,
+                'show_texture_var': False,
+                'show_texture_settings_var': False,
+                'show_master_var': True,
+                'show_media_var': True,
+                'show_file_var': True,
+                'show_status_var': True,
+            },
+            'texture_edit': {
+                'show_gif_var': False,
+                'show_gif_settings_var': False,
+                'show_texture_var': True,
+                'show_texture_settings_var': True,
+                'show_master_var': True,
+                'show_media_var': False,
+                'show_file_var': True,
+                'show_status_var': True,
+            },
+        }
+
+        preset = presets.get(preset_name)
+        if preset is None:
+            return
+
+        for var_name, is_visible in preset.items():
+            var = getattr(self, var_name, None)
+            if var is not None:
+                var.set(is_visible)
+
+        self._toggle_gif_preview()
+        self._toggle_gif_settings()
+        self._toggle_texture_preview()
+        self._toggle_texture_settings()
+        self._repack_groups()
+
+    def _adjust_window_size_to_content(self):
+        """Passt die Fenstergröße an den aktuellen Inhalt an."""
+        self.root.update_idletasks()
+        try:
+            req_width = self.root.winfo_reqwidth()
+            req_height = self.root.winfo_reqheight()
+
+            min_width = 1300
+            min_height = 450
+
+            new_width = max(req_width, min_width)
+            new_height = max(req_height, min_height)
+
+            screen_width = self.root.winfo_screenwidth()
+            screen_height = self.root.winfo_screenheight()
+            max_width = int(screen_width * 0.9)
+            max_height = int(screen_height * 0.9)
+
+            new_width = min(new_width, max_width)
+            new_height = min(new_height, max_height)
+
+            x = (screen_width // 2) - (new_width // 2)
+            y = (screen_height // 2) - (new_height // 2)
+
+            self.root.geometry(f'{new_width}x{new_height}+{x}+{y}')
+        except Exception as e:
+            logger.debug(f"Could not adjust window size: {e}", exc_info=False)
     
     def _repack_groups(self):
         """Packt alle Gruppen in der richtigen Reihenfolge neu."""
@@ -1137,39 +1367,7 @@ Python {'.'.join(map(str, __import__('sys').version_info[:3]))}
         if self.status_group is not None and self.show_status_var.get():
             self.status_group.pack(fill=tk.X, padx=10, pady=(5,5))
         
-        # Layout neu berechnen und Fenster anpassen
-        self.root.update_idletasks()
-        # Fenstergröße an Inhalt anpassen
-        try:
-            req_width = self.root.winfo_reqwidth()
-            req_height = self.root.winfo_reqheight()
-            current_width = self.root.winfo_width()
-            current_height = self.root.winfo_height()
-            
-            # Mindestgröße festlegen
-            min_width = 1300
-            min_height = 800
-            
-            # Fenstergrößen an erforderliche Größe anpassen (sowohl wachsen als auch schrumpfen)
-            new_width = max(req_width, min_width)
-            new_height = max(req_height, min_height)
-            
-            # Bildschirmgröße berücksichtigen (max 90%)
-            screen_width = self.root.winfo_screenwidth()
-            screen_height = self.root.winfo_screenheight()
-            max_width = int(screen_width * 0.9)
-            max_height = int(screen_height * 0.9)
-            
-            new_width = min(new_width, max_width)
-            new_height = min(new_height, max_height)
-            
-            # Fenster zentrieren
-            x = (screen_width // 2) - (new_width // 2)
-            y = (screen_height // 2) - (new_height // 2)
-            
-            self.root.geometry(f'{new_width}x{new_height}+{x}+{y}')
-        except Exception as e:
-            logger.debug(f"Could not adjust window size: {e}", exc_info=False)
+        self._adjust_window_size_to_content()
     
     def _toggle_master_group(self):
         """Toggle Master-Einstellungen ein/aus."""
