@@ -1,0 +1,46 @@
+name: Make GitHub Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release-Tag (z. B. v2.0.11)"
+        required: true
+        type: string
+      build_run_id:
+        description: "Run-ID aus build-release.yml (Artifacts-Quelle)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts from build run
+        uses: dawidd6/action-download-artifact@v9
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          run_id: ${{ inputs.build_run_id }}
+          workflow: build-release.yml
+          path: release-assets
+          if_no_artifact_found: fail
+
+      - name: Show downloaded files
+        shell: bash
+        run: |
+          ls -la release-assets
+          find release-assets -type f
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          name: ${{ inputs.release_tag }}
+          files: |
+            release-assets/**/*
+          fail_on_unmatched_files: true
