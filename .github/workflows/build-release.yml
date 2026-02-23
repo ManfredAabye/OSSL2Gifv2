@@ -1,67 +1,88 @@
-name: Build Executables for Windows, Linux & macOS
+name: Build & Release OSSL2Gif
 
 on:
   push:
     tags:
-      - 'v*'           # Bei neuen Tags wie v1.0.0 automatisch starten
-  workflow_dispatch:    # Manuell über GitHub-UI startbar
-    inputs:
-      version:
-        description: 'Version (z.B. v1.0.0)'
-        required: true
+      - v*
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false  # Wenn ein Build fehlschlägt, trotzdem weitermachen
+      fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
         include:
           - os: windows-latest
-            artifact_name: mein-programm-windows.exe
-            asset_name: mein-programm-windows-amd64.exe
+            platform: windows-x64
+            executable: OSSL2Gif.exe
+            archive: OSSL2Gif-windows-x64.zip
           - os: ubuntu-latest
-            artifact_name: mein-programm-linux
-            asset_name: mein-programm-linux-amd64
+            platform: linux-x64
+            executable: OSSL2Gif
+            archive: OSSL2Gif-linux-x64.tar.gz
           - os: macos-latest
-            artifact_name: mein-programm-macos
-            asset_name: mein-programm-macos-amd64
-    
-    runs-on: ${{ matrix.os }}
-    
+            platform: macos-x64
+            executable: OSSL2Gif
+            archive: OSSL2Gif-macos-x64.tar.gz
+
     steps:
-      - name: 📥 Repository auschecken
+      - name: Checkout repository
         uses: actions/checkout@v4
-      
-      - name: 🐍 Python 3.13 einrichten
+
+      - name: Setup Python 3.13
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
-          
-      - name: 📦 Abhängigkeiten installieren
+          python-version: "3.13"
+
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        shell: bash
-      
-      - name: 🔨 Executable bauen mit PyInstaller
+          pip install -r requirements.txt
+
+      - name: Build binary with PyInstaller
         run: |
-          pyinstaller --onefile --name mein-programm mein_hauptskript.py
-        shell: bash
-      
-      - name: 📝 Dateien umbenennen (plattformspezifisch)
+          pyinstaller --noconfirm --clean --onefile --windowed --name OSSL2Gif start.py
+
+      - name: Package build output (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            mv dist/mein-programm.exe dist/${{ matrix.artifact_name }}
-          else
-            mv dist/mein-programm dist/${{ matrix.artifact_name }}
-            chmod +x dist/${{ matrix.artifact_name }}
-          fi
+          New-Item -ItemType Directory -Path release -Force | Out-Null
+          Compress-Archive -Path "dist/${{ matrix.executable }}" -DestinationPath "release/${{ matrix.archive }}" -Force
+
+      - name: Package build output (Linux/macOS)
+        if: runner.os != 'Windows'
         shell: bash
-      
-      - name: 📤 Build-Artefakte hochladen
+        run: |
+          mkdir -p release
+          chmod +x "dist/${{ matrix.executable }}"
+          tar -czf "release/${{ matrix.archive }}" -C dist "${{ matrix.executable }}"
+
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: dist/${{ matrix.artifact_name }}
+          name: ${{ matrix.platform }}
+          path: release/${{ matrix.archive }}
+
+  release:
+    name: Create GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          fail_on_unmatched_files: true
