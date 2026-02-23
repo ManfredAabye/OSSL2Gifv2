@@ -53,19 +53,31 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path release -Force | Out-Null
-          Compress-Archive -Path "dist/${{ matrix.executable }}" -DestinationPath "release/${{ matrix.archive }}" -Force
+          $bundle = "release/bundle"
+          New-Item -ItemType Directory -Path $bundle -Force | Out-Null
+          Copy-Item -Path "dist/${{ matrix.executable }}" -Destination $bundle -Force
+          if (Test-Path "icon.ico") { Copy-Item -Path "icon.ico" -Destination $bundle -Force }
+          if (Test-Path "README.md") { Copy-Item -Path "README.md" -Destination $bundle -Force }
+          if (Test-Path "LICENSE") { Copy-Item -Path "LICENSE" -Destination $bundle -Force }
+          Compress-Archive -Path "$bundle/*" -DestinationPath "release/${{ matrix.archive }}" -Force
 
       - name: Package build output (Linux/macOS)
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          mkdir -p release
+          mkdir -p release bundle
           chmod +x "dist/${{ matrix.executable }}"
-          tar -czf "release/${{ matrix.archive }}" -C dist "${{ matrix.executable }}"
+          cp -f "dist/${{ matrix.executable }}" bundle/
+          [ -f icon.ico ] && cp -f icon.ico bundle/
+          [ -f README.md ] && cp -f README.md bundle/
+          [ -f LICENSE ] && cp -f LICENSE bundle/
+          tar -czf "release/${{ matrix.archive }}" -C bundle .
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform }}
           path: release/${{ matrix.archive }}
+          if-no-files-found: error
+          retention-days: 14
 
