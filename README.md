@@ -1,9 +1,9 @@
 
-# OSSL2Gif – GIF zu Textur Konverter (Version 2.0.10)
+# OSSL2Gif – GIF zu Textur Konverter (Version 2.1.3)
 
-Mit OSSL2Gif 2.0.10 wandelst du animierte GIFs komfortabel in Texturen für Second Life/OpenSim um – jetzt mit vielen neuen Features und moderner Oberfläche!
+Mit OSSL2Gif 2.1.3 wandelst du animierte GIFs komfortabel in Texturen für Second Life/OpenSim um – jetzt mit vielen neuen Features und moderner Oberfläche!
 
-## Was ist neu in 2.0.10?
+## Was ist neu in 2.1.3?
 
 - **Einzelne Bilder entfernen:** Über den neuen "Entfernen"-Button kannst du gezielt einzelne Frames aus der GIF-Liste löschen.
 - **Max. Bilder:** Die maximale Bildanzahl ist einstellbar. Überschüssige Bilder werden automatisch entfernt.
@@ -387,7 +387,7 @@ PyOSSL2Gif/
 └── requirements.txt      # Python-Abhängigkeiten
 ```
 
-### Neue Systemkomponenten (ab 2.0.10)
+### Neue Systemkomponenten (ab 2.1.3)
 
 - **Service-Initialisierung:** `app_bootstrap.py` registriert Services und schliesst sie sauber beim Beenden.
 - **Event Bus:** `event_bus.py` entkoppelt GUI, Processing und IO ueber Events.
@@ -933,3 +933,4 @@ python -m pytest test_*.py
 - 1.x: Grundfunktionen (GIF laden, speichern, Effekte, Export)
 
 ---
+
