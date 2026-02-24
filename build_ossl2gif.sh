@@ -54,6 +54,7 @@ fi
 # --- 3. Virtuelle Build-Umgebung erstellen ---
 echo -e "\n${YELLOW}[3/7] Erstelle virtuelle Build-Umgebung '${VENV_DIR}'...${NC}"
 python3 -m venv "$VENV_DIR"
+# shellcheck disable=SC1091
 source "$VENV_DIR/bin/activate"
 
 echo -e "${GREEN}✓ Virtuelle Umgebung aktiviert.${NC}"
@@ -89,6 +90,7 @@ if [ ! -f "$MAIN_SCRIPT" ]; then
 fi
 
 # Entferne alte Build-Artefakte
+# shellcheck disable=SC2035
 rm -rf build dist *.spec
 
 # --- 6. PyInstaller Build ausführen ---
@@ -138,6 +140,7 @@ if [ -f "dist/$OUTPUT_NAME" ]; then
     echo ""
     echo "Datei-Informationen:"
     echo "  Größe: $(du -h dist/$OUTPUT_NAME | cut -f1)"
+    # shellcheck disable=SC2012
     echo "  Berechtigungen: $(ls -l dist/$OUTPUT_NAME | awk '{print $1}')"
     echo ""
     echo "Zum Ausführen:"

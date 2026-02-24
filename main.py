@@ -84,7 +84,7 @@ except Exception as e:
     DEFAULT_LANGUAGE = 'unknown'
 
 LANGUAGES = ['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt', 'uk', 'ja', 'zh']
-Version = "2.1.1"
+Version = "2.1.2"
 WindowsSize  = "1650x950"
 
 class ModernApp:
@@ -299,12 +299,15 @@ class ModernApp:
         self.gif_preview_frame = None
         self.texture_preview_frame = None
         
-        try:
-            self.root.iconbitmap("icon.ico")
-        except FileNotFoundError:
-            logger.debug("Icon file 'icon.ico' not found - continuing without icon")
-        except Exception as e:
-            logger.warning(f"Failed to load icon: {type(e).__name__}: {e}", exc_info=False)
+        # Icon nur unter Windows laden (.ico wird nur von Windows unterstützt)
+        import platform
+        if platform.system() == "Windows":
+            try:
+                self.root.iconbitmap("icon.ico")
+            except FileNotFoundError:
+                logger.debug("Icon file 'icon.ico' not found - continuing without icon")
+            except Exception as e:
+                logger.warning(f"Failed to load icon: {type(e).__name__}: {e}", exc_info=False)
         if THEME_AVAILABLE and tb is not None:
             tb.Style("superhero")
         self.tooltips = {}

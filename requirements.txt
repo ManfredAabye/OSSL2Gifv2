@@ -20,10 +20,11 @@ Pillow==12.1.1
 #   - Bugfixes für alpha_composite
 #   - Python 3.13 vollständig unterstützt
 
-numpy==1.26.4
+numpy==2.1.2
 # Numerische Berechnungen für Bildfilter
 # - Wird für Blur, Sharpen und andere Effekte benötigt
-# - Python 3.13 Unterstützung
+# - Python 3.13 vollständig unterstützt
+# - Upgrade von 1.26.4: Wheels für alle Plattformen verfügbar
 
 # GUI-Framework (erforderlich für modernes Theme)
 # -----------------------------------------------
