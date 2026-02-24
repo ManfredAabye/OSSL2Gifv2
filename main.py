@@ -84,8 +84,27 @@ except Exception as e:
     DEFAULT_LANGUAGE = 'unknown'
 
 LANGUAGES = ['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt', 'uk', 'ja', 'zh']
-Version = "2.1.2"
-WindowsSize  = "1650x950"
+Version = "2.1.3"
+
+# ============================================================================
+# FENSTERGRÖSSENEINSTELLUNGEN - HIER KÖNNEN WERTE MANUELL ANGEPASST WERDEN
+# ============================================================================
+# Diese Werte definieren die Standard-Fenstergrößen für die Anwendung.
+# Die zentrale Methode _apply_window_geometry() liest diese Werte aus.
+
+# Standard-Fenstergröße in Pixeln (wird mit DPI multipliziert)
+WINDOW_BASE_WIDTH = 1000       # Basis-Breite (wird mit Sprache multipliziert)
+WINDOW_BASE_HEIGHT = 950       # Basis-Höhe
+
+# Minimale Fenstergröße in Pixeln (wird mit DPI multipliziert)
+WINDOW_MIN_WIDTH = 900
+WINDOW_MIN_HEIGHT = 750
+
+# Maximale Fenstergröße als Prozentsatz des Bildschirms
+WINDOW_MAX_PERCENT_OF_SCREEN = 0.9  # 90% --> ändere auf 0.95 für 95% oder 1.0 für 100%
+
+# Fallback-Geometrie (wird nur verwendet wenn andere Methoden fehlschlagen)
+WindowsSize = f"{WINDOW_MIN_WIDTH}x{WINDOW_BASE_HEIGHT}"
 
 class ModernApp:
     def _bind_effects_panel_events(self):
@@ -167,6 +186,7 @@ class ModernApp:
 
     def __init__(self, root):
         self.root = root
+        self.dpi_scale = getattr(root, 'dpi_scale', 1.0)  # DPI-Skalierungsfaktor (default 1.0)
         
         # Setze Standardfarben für Menüs auf dunkel
         try:
@@ -222,6 +242,7 @@ class ModernApp:
         self.texture_colorintensity_active = tk.BooleanVar(value=False)
 
         # Initialize dynamically set GUI attributes
+        self.main_canvas = None  # Canvas für scrollbare Layout (wird in gui_layout.py gesetzt)
         self.gif_label = None
         self.gif_canvas = None
         self.gif_settings = None
@@ -370,8 +391,8 @@ class ModernApp:
             self.apply_config(config)
             self._config_loaded = True
         else:
-            # Nur optimieren, wenn KEINE config vorhanden ist
-            self._optimize_window_size()
+            # Fenster wird später automatisch optimiert
+            pass
         self._setup_drag_and_drop()
         # Bindings für Effekte-Panels IMMER setzen
         self._bind_effects_panel_events()
@@ -382,6 +403,17 @@ class ModernApp:
         self.root.update()
         self.root.deiconify()  # Zeige Fenster an (es wurde mit withdraw() versteckt)
         logger.info("Application window displayed")
+        
+        # Optimiere Fenstergröße NACH dem vollständigen Rendering
+        # Das ist essentiell, damit der Canvas-Inhalt vollständig berechnet ist
+        def finalize_window_size():
+            self.root.update_idletasks()
+            self._apply_window_geometry()  # Zentrale Fenstergrößen-Methode
+            # Aktualisiere Canvas-Scrollregion nach Fenster-Größen-Anpassung
+            self.root.update_idletasks()
+            logger.debug("Window size optimization completed")
+        
+        self.root.after(200, finalize_window_size)
 
         # --- Event-Bindings zentral setzen ---
         # Entfernen-Button für Frames verbinden
@@ -593,7 +625,7 @@ class ModernApp:
         # Wenn KEINE gespeicherte Fenster-Geometrie gefunden, optimiere die Größe
         if not window_geometry_restored:
             logger.debug("No window geometry in config, optimizing window size")
-            self._optimize_window_size()
+            self._apply_window_geometry()
 
         # Für Pylance: Initialisiere dynamisch gesetzte GUI-Attribute
         self.gif_label = getattr(self, 'gif_label', None)
@@ -626,61 +658,88 @@ class ModernApp:
         
         logger.debug("Group visibility settings applied")
 
-    def _optimize_window_size(self):
-        """Passt die Fenstergeometrie automatisch an den Inhalt an."""
+    def _apply_window_geometry(self):
+        """
+        ZENTRALE Fenstergrößen-Methode - alle Größenberechnungen laufen über diese Methode.
+        
+        Liest die Konfigurationen aus den globalen Konstanten am Anfang der Datei:
+        - WINDOW_BASE_WIDTH: Standard-Fensterbreite
+        - WINDOW_BASE_HEIGHT: Standard-Fensterhöhe
+        - WINDOW_MIN_WIDTH/HEIGHT: Minimale Größe
+        - WINDOW_MAX_PERCENT_OF_SCREEN: Maximale Größe relativ zum Bildschirm
+        
+        Basis-Logik:
+        - Standard-Fenstergröße wird mit DPI-Faktor multipliziert
+        - Breite wird mit Sprache-Multiplikator angepasst
+        - Größe wird auf min/max Grenzen begrenzt
+        - Fenster wird zentriert
+        """
         try:
-            # Berechne erforderliche Größe
-            req_width = self.root.winfo_reqwidth()
-            req_height = self.root.winfo_reqheight()
-            logger.debug(f"Window requested size: {req_width}x{req_height}")
+            dpi = getattr(self, 'dpi_scale', 1.0)
             
-            # Multiplier basierend auf Sprache: Längere Sprachen brauchen mehr Platz
+            # === BASIS-GRÖSSE (aus globalen Konstanten) ===
+            base_width = WINDOW_BASE_WIDTH
+            base_height = WINDOW_BASE_HEIGHT
+            
+            # === SPRACHE-ANPASSUNG (nur Breite) ===
             lang_multipliers = {
-                'ru': 1.3,  # Russisch ist länger
-                'uk': 1.3,  # Ukrainisch ist länger
-                'pt': 1.1,  # Portugiesisch ist etwas länger
-                'de': 1.1,  # Deutsch ist etwas länger
+                'ru': 1.2,  # Russisch ist länger
+                'uk': 1.2,  # Ukrainisch ist länger
+                'pt': 1.05, # Portugiesisch ist etwas länger
+                'de': 1.05, # Deutsch ist etwas länger
                 'en': 1.0,  # Englisch Basis
                 'fr': 1.0,
                 'es': 1.0,
                 'it': 0.95,
-                'nl': 1.05,
+                'nl': 1.0,
                 'se': 0.95,
-                'pl': 1.1,
+                'pl': 1.05,
                 'ja': 0.9,  # Japanisch ist kompakter
                 'zh': 0.9   # Chinesisch ist kompakter
             }
             
             current_lang = getattr(self, 'lang', 'en')
-            multiplier = lang_multipliers.get(current_lang, 1.0)
+            lang_multiplier = lang_multipliers.get(current_lang, 1.0)
             
-            # Setze Mindest- und Maximalgrößen
-            min_width = max(int(req_width * multiplier), 1300)
-            min_height = max(req_height, 950)  # 50 Pixel höher
+            # Berechne Fensterbreite mit Sprache-Anpassung
+            window_width = int(base_width * lang_multiplier * dpi)
+            window_height = int(base_height * dpi)
             
-            # Begrenze die Größe auf den verfügbaren Bildschirmbereich
+            # === BILDSCHIRM-GRENZEN ===
             screen_width = self.root.winfo_screenwidth()
             screen_height = self.root.winfo_screenheight()
-            logger.debug(f"Screen size: {screen_width}x{screen_height}")
             
-            # Verwende max. 90% des Bildschirms, aber mind. 1300x900
-            max_width = int(screen_width * 0.9)
-            max_height = int(screen_height * 0.9)
+            # Mindestgröße (aus globalen Konstanten)
+            min_width = int(WINDOW_MIN_WIDTH * dpi)
+            min_height = int(WINDOW_MIN_HEIGHT * dpi)
             
-            window_width = min(min_width, max_width)
-            window_height = min(min_height, max_height)
+            # Maximalgröße (aus globaler Konstante)
+            max_width = int(screen_width * WINDOW_MAX_PERCENT_OF_SCREEN)
+            max_height = int(screen_height * WINDOW_MAX_PERCENT_OF_SCREEN)
             
-            # Zentriere das Fenster auf dem Bildschirm
+            # Wende Grenzen an
+            window_width = max(min_width, min(window_width, max_width))
+            window_height = max(min_height, min(window_height, max_height))
+            
+            # === ZENTRIEREN ===
             x = (screen_width // 2) - (window_width // 2)
             y = (screen_height // 2) - (window_height // 2)
             
+            # Wende Geometrie an
             self.root.geometry(f'{window_width}x{window_height}+{x}+{y}')
-            logger.info(f"Window optimized to size: {window_width}x{window_height} at position +{x}+{y}")
+            logger.info(f"Window geometry applied: {window_width}x{window_height}+{x}+{y} (DPI: {dpi:.2f}, Lang: {current_lang})")
+            
         except Exception as e:
-            logger.error(f"Could not optimize window size: {e}", exc_info=True)
-            # Fallback auf Standard-Größe
+            logger.error(f"Could not apply window geometry: {e}", exc_info=True)
+            # Fallback
             self.root.geometry(WindowsSize)
-            logger.info(f"Fallback to default window size: {WindowsSize}")
+
+    def _optimize_window_size(self):
+        """
+        VERALTET: Bitte verwende _apply_window_geometry() stattdessen.
+        Diese Methode ruft nur die zentrale Methode auf.
+        """
+        self._apply_window_geometry()
 
     def build_layout(self):
         build_layout(self)
@@ -1274,16 +1333,18 @@ Python {'.'.join(map(str, __import__('sys').version_info[:3]))}
                 'show_status_var': True,
             },
             'media_player': {
+                # Nur GIF-Vorschau und Media-Controls für einfache Animation
                 'show_gif_var': True,
                 'show_gif_settings_var': False,
                 'show_texture_var': False,
                 'show_texture_settings_var': False,
                 'show_master_var': False,
                 'show_media_var': True,
-                'show_file_var': False,
+                'show_file_var': True,  # Datei-Gruppe für Laden/Speichern
                 'show_status_var': True,
             },
             'gif_edit': {
+                # GIF-Fokus: Vorschau + Einstellungen + alle Kontrollen
                 'show_gif_var': True,
                 'show_gif_settings_var': True,
                 'show_texture_var': False,
@@ -1294,6 +1355,7 @@ Python {'.'.join(map(str, __import__('sys').version_info[:3]))}
                 'show_status_var': True,
             },
             'texture_edit': {
+                # Textur-Fokus: Vorschau + Einstellungen + alle Kontrollen
                 'show_gif_var': False,
                 'show_gif_settings_var': False,
                 'show_texture_var': True,
@@ -1319,34 +1381,26 @@ Python {'.'.join(map(str, __import__('sys').version_info[:3]))}
         self._toggle_texture_preview()
         self._toggle_texture_settings()
         self._repack_groups()
+        
+        # Vollständig aktualisieren, bevor Größe berechnet wird
+        self.root.update_idletasks()
+        
+        # Passe Fenstergröße an (zentrale Methode mit verzögerung)
+        self.root.after(100, self._apply_window_geometry)
 
     def _adjust_window_size_to_content(self):
-        """Passt die Fenstergröße an den aktuellen Inhalt an."""
+        """Passt die Fenstergröße an (ruft zentrale Methode auf)."""
         self.root.update_idletasks()
+        self.root.after(50, self._apply_window_geometry)
+    
+    def _update_canvas_scroll_region(self):
+        """Aktualisiert die Canvas-Scrollregion."""
         try:
-            req_width = self.root.winfo_reqwidth()
-            req_height = self.root.winfo_reqheight()
-
-            min_width = 1300
-            min_height = 450
-
-            new_width = max(req_width, min_width)
-            new_height = max(req_height, min_height)
-
-            screen_width = self.root.winfo_screenwidth()
-            screen_height = self.root.winfo_screenheight()
-            max_width = int(screen_width * 0.9)
-            max_height = int(screen_height * 0.9)
-
-            new_width = min(new_width, max_width)
-            new_height = min(new_height, max_height)
-
-            x = (screen_width // 2) - (new_width // 2)
-            y = (screen_height // 2) - (new_height // 2)
-
-            self.root.geometry(f'{new_width}x{new_height}+{x}+{y}')
+            if hasattr(self, 'main_canvas') and self.main_canvas:
+                self.main_canvas.update_idletasks()
+                self.main_canvas.configure(scrollregion=self.main_canvas.bbox("all"))
         except Exception as e:
-            logger.debug(f"Could not adjust window size: {e}", exc_info=False)
+            logger.debug(f"Failed to update canvas scroll region: {e}", exc_info=False)
     
     def _repack_groups(self):
         """Packt alle Gruppen in der richtigen Reihenfolge neu."""

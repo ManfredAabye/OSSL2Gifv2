@@ -247,41 +247,6 @@ def create_checkerboard_with_color(hex_color, alpha=255, size=24, checker_size=4
 	
 	return ImageTk.PhotoImage(img)
 
-# === Globale GUI-Design-Konstanten ===
-GUI_FONT_FAMILY = "Segoe UI"
-GUI_FONT_SIZE = 10
-GUI_FONT = (GUI_FONT_FAMILY, GUI_FONT_SIZE)
-GUI_LABEL_BG = "#f5f5f5"
-GUI_LABEL_FG = "black"
-# Standard-Button
-GUI_BUTTON_BG = "#e0e0e0"
-GUI_BUTTON_FG = "black"
-GUI_BUTTON_WIDTH = 8
-GUI_BUTTON_HEIGHT = 1
-# Erfolgs-Button (z.B. Laden)
-GUI_SUCCESS_BG = "#4CAF50"
-GUI_SUCCESS_FG = "white"
-GUI_SUCCESS_WIDTH = 8
-GUI_SUCCESS_HEIGHT = 1
-# Warn-/Löschen-Button (z.B. Reset, Clear)
-GUI_WARN_BG = "#e53935"
-GUI_WARN_FG = "white"
-GUI_WARN_WIDTH = 14
-GUI_WARN_HEIGHT = 1
-# Info-Button (z.B. Export)
-GUI_INFO_BG = "#90CAF9"
-GUI_INFO_FG = "black"
-GUI_INFO_WIDTH = 8
-GUI_INFO_HEIGHT = 1
-# Akzent-Button (z.B. Play, Next)
-GUI_ACCENT_BG = "#e0f7fa"
-GUI_ACCENT_FG = "black"
-GUI_ACCENT_WIDTH = 8
-GUI_ACCENT_HEIGHT = 1
-# Label-Größen
-GUI_LABEL_WIDTH = 20
-GUI_LABEL_HEIGHT = 1
-
 def create_effects_panel(self, parent, prefix):
 	settings_icon = "⚙"
 	frame = ttk.LabelFrame(parent, text=f"{settings_icon} {tr(f'{prefix}_settings', self.lang) or ''}")
@@ -363,6 +328,45 @@ def create_effects_panel(self, parent, prefix):
 def build_layout(self):
 	"""Erstellt das gesamte GUI-Layout."""
 	
+	# === Globale GUI-Design-Konstanten mit DPI-Skalierung ===
+	dpi = getattr(self, 'dpi_scale', 1.0)
+	
+	GUI_FONT_FAMILY = "Segoe UI"
+	GUI_FONT_SIZE = max(8, int(10 * dpi))  # Mindestens 8pt auch bei sehr niedrigem DPI
+	GUI_FONT = (GUI_FONT_FAMILY, GUI_FONT_SIZE)
+	GUI_LABEL_BG = "#f5f5f5"
+	GUI_LABEL_FG = "black"
+	# Standard-Button
+	GUI_BUTTON_BG = "#e0e0e0"
+	GUI_BUTTON_FG = "black"
+	GUI_BUTTON_WIDTH = 8
+	GUI_BUTTON_HEIGHT = 1
+	# Erfolgs-Button (z.B. Laden)
+	GUI_SUCCESS_BG = "#4CAF50"
+	GUI_SUCCESS_FG = "white"
+	GUI_SUCCESS_WIDTH = 8
+	GUI_SUCCESS_HEIGHT = 1
+	# Warn-/Löschen-Button (z.B. Reset, Clear)
+	GUI_WARN_BG = "#e53935"
+	GUI_WARN_FG = "white"
+	GUI_WARN_WIDTH = 20
+	GUI_WARN_HEIGHT = 1
+	# Info-Button (z.B. Export)
+	GUI_INFO_BG = "#90CAF9"
+	GUI_INFO_FG = "black"
+	GUI_INFO_WIDTH = 8
+	GUI_INFO_HEIGHT = 1
+	# Akzent-Button (z.B. Play, Next)
+	GUI_ACCENT_BG = "#e0f7fa"
+	GUI_ACCENT_FG = "black"
+	GUI_ACCENT_WIDTH = 8
+	GUI_ACCENT_HEIGHT = 1
+	# Label-Größen
+	GUI_LABEL_WIDTH = 20
+	GUI_LABEL_HEIGHT = 1
+	
+	logger.debug(f"GUI Font size adjusted for DPI {dpi:.2f}: {GUI_FONT_SIZE}pt")
+	
 	# === MENU BAR (Menüleiste oben) ===
 	# Erstellt die Hauptmenüleiste: File, Edit, View, Groups, Help
 	# Definition in create_menubar() (Zeile 17)
@@ -380,10 +384,49 @@ def build_layout(self):
 	# Initialisierung für frame_select_var (wird für Spinbox benötigt)
 	self.frame_select_var = tk.IntVar(value=0)
 
-	# Haupt-Layout: 2 Spalten, unten Einstellungen
+	# === GLOBALER SCROLLBAR FÜR GESAMTES LAYOUT ===
+	# Canvas + Scrollbar für das gesamte Fenster (Preview + Einstellungen)
 	main = ttk.Frame(self.root)
 	main.pack(fill=tk.BOTH, expand=True)
-	content = ttk.Frame(main)
+	
+	scrollbar = ttk.Scrollbar(main)
+	scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+	
+	main_canvas = tk.Canvas(main, bg="#f5f5f5", yscrollcommand=scrollbar.set, highlightthickness=0)
+	main_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+	self.main_canvas = main_canvas  # Speichere als Instanz-Variable für später Zugriff
+	scrollbar.config(command=main_canvas.yview)
+	
+	# Innerer Frame für alle Inhalte
+	main_inner = ttk.Frame(main_canvas, name='main_inner')
+	main_canvas_window = main_canvas.create_window((0, 0), window=main_inner, anchor="nw")
+	
+	# Mousewheel/Scroll-Binding für Canvas
+	def on_mousewheel(event):
+		delta = event.delta if hasattr(event, 'delta') else 0
+		main_canvas.yview_scroll(int(-1*(delta/120)), "units")
+	def on_linux_scroll(event):
+		if event.num == 4:
+			main_canvas.yview_scroll(-1, "units")
+		elif event.num == 5:
+			main_canvas.yview_scroll(1, "units")
+	main_canvas.bind("<MouseWheel>", on_mousewheel)
+	main_canvas.bind("<Button-4>", on_linux_scroll)
+	main_canvas.bind("<Button-5>", on_linux_scroll)
+	
+	# Größe des Canvas nach dem Befüllen anpassen (wird nachher aufgerufen)
+	def on_full_frame_configure(event=None):
+		main_canvas.configure(scrollregion=main_canvas.bbox("all"))
+		# Canvas-Fenster so breit wie Canvas machen
+		canvas_width = main_canvas.winfo_width()
+		if canvas_width > 1:
+			main_canvas.itemconfig(main_canvas_window, width=canvas_width)
+	
+	# Bind nur einmal beim Canvas-Resize, nicht bei jedem Configure-Event
+	main_canvas.bind("<Configure>", on_full_frame_configure)
+
+	# Haupt-Layout: 2 Spalten, unten Einstellungen
+	content = ttk.Frame(main_inner)
 	content.pack(fill=tk.BOTH, expand=True)
 	self.content_frame = content
 	content.columnconfigure(0, weight=1)
@@ -448,16 +491,16 @@ def build_layout(self):
 	self.tooltips['texture_settings'] = ToolTip(self.texture_settings, tr('tt_texture_settings', self.lang))
 
 	# --- Master Einstellungen ---
-	self.master_group = ttk.LabelFrame(main, text=f"🛠 {tr('master_settings', self.lang) or 'Master Einstellungen'}")
+	self.master_group = ttk.LabelFrame(main_inner, text=f"🛠 {tr('master_settings', self.lang) or 'Master Einstellungen'}")
 	self.master_group.pack(fill=tk.X, padx=10, pady=(5,2))
 
 	# --- Media ---
-	self.media_group = ttk.LabelFrame(main, text=f"🎬 {tr('media', self.lang) or 'Media'}")
+	self.media_group = ttk.LabelFrame(main_inner, text=f"🎬 {tr('media', self.lang) or 'Media'}")
 	self.media_group.pack(fill=tk.X, padx=10, pady=(5,2))
 
 	# --- Datei-Gruppe (File Group) ---
 	# Diese LabelFrame enthält die Haupt-Funktions-Toolbar (Load, Save, Export, etc.)
-	self.file_group = ttk.LabelFrame(main, text=f"📁 {tr('file', self.lang) or 'Datei'}")
+	self.file_group = ttk.LabelFrame(main_inner, text=f"📁 {tr('file', self.lang) or 'Datei'}")
 	self.file_group.pack(fill=tk.X, padx=10, pady=(5,2))
 	
 	try:
@@ -785,7 +828,7 @@ def build_layout(self):
 	self.tooltips['reset_btn'] = ToolTip(self.reset_btn, tr('tt_reset_btn', self.lang))
 
 	# --- Status-Gruppe ---
-	self.status_group = ttk.LabelFrame(main, text=f"📋 {tr('status', self.lang) or 'Status'}")
+	self.status_group = ttk.LabelFrame(main_inner, text=f"📋 {tr('status', self.lang) or 'Status'}")
 	self.status_group.pack(fill=tk.X, padx=10, pady=(5,5))
 	self.status = ttk.Label(self.status_group, text=tr('ready', self.lang) or "Bereit", anchor="w")
 	self.status.pack(fill=tk.X)
