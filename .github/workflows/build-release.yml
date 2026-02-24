@@ -19,14 +19,17 @@ jobs:
         include:
           - os: windows-latest
             platform: windows-x64
+            python-version: "3.12"
             executable: OSSL2Gif.exe
             archive: OSSL2Gif-windows-x64.zip
           - os: ubuntu-latest
             platform: linux-x64
+            python-version: "3.13"
             executable: OSSL2Gif
             archive: OSSL2Gif-linux-x64.tar.gz
           - os: macos-latest
             platform: macos-x64
+            python-version: "3.13"
             executable: OSSL2Gif
             archive: OSSL2Gif-macos-x64.tar.gz
 
@@ -34,10 +37,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Python 3.13
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
