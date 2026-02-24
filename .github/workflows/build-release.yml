@@ -56,7 +56,7 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          pyinstaller --noconfirm --clean --onefile --name OSSL2Gif --collect-all PIL --hidden-import PIL._tkinter_finder start.py
+          pyinstaller --noconfirm --clean --onefile --name OSSL2Gif --collect-all PIL --hidden-import PIL._tkinter_finder --collect-all ttkbootstrap start.py
 
       - name: Package build output (Windows)
         if: runner.os == 'Windows'
