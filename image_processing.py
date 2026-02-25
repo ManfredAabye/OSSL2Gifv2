@@ -21,7 +21,7 @@ from event_bus import get_event_bus, EventType
 
 logger = get_logger(__name__)
 
-def calculate_optimal_grid(frame_count: int) -> tuple[int, int]:
+def calculate_optimal_grid(frame_count: int, prefer_single_row_odd: bool = True) -> tuple[int, int]:
 	"""
 	Berechnet optimale Raster-Aufteilung für Frames.
 	Bevorzugt Layouts ohne Verschwendung (leere Zellen) und möglichst quadratische Form.
@@ -68,6 +68,13 @@ def calculate_optimal_grid(frame_count: int) -> tuple[int, int]:
 			best_waste = waste
 			best_ratio = ratio
 	
+	# Optional: Bei ungerader Frame-Zahl nicht einreihig anordnen.
+	# Beispiel: 5 Frames -> 3x2 statt 5x1
+	if not prefer_single_row_odd and frame_count > 3 and frame_count % 2 == 1 and min(best_x, best_y) == 1:
+		compact_x = math.ceil(math.sqrt(frame_count))
+		compact_y = math.ceil(frame_count / compact_x)
+		best_x, best_y = compact_x, compact_y
+
 	# Stelle sicher, dass tiles_x >= tiles_y (mehr Spalten als Zeilen)
 	if best_x < best_y:
 		best_x, best_y = best_y, best_x
@@ -93,7 +100,14 @@ def create_smart_scaled_texture(self: ModernAppProtocol, target_w: int, target_h
 	"""
 	try:
 		frame_count = self.frame_count
-		tiles_x, tiles_y = calculate_optimal_grid(frame_count)
+		prefer_single_row_odd = True
+		odd_row_var = getattr(self, 'odd_frames_single_row_var', None)
+		if odd_row_var is not None:
+			try:
+				prefer_single_row_odd = bool(odd_row_var.get())
+			except Exception:
+				prefer_single_row_odd = True
+		tiles_x, tiles_y = calculate_optimal_grid(frame_count, prefer_single_row_odd=prefer_single_row_odd)
 		
 		# Ermittle durchschnittliche Frame-Größe
 		if self.gif_frames:

@@ -115,7 +115,17 @@ class TexturePreviewWindow:
 		"""Bereitet die Textur für die Vorschau vor."""
 		try:
 			# Grid berechnen
-			self.tiles_x, self.tiles_y = calculate_optimal_grid(len(self.app.gif_frames))
+			prefer_single_row_odd = True
+			odd_row_var = getattr(self.app, 'odd_frames_single_row_var', None)
+			if odd_row_var is not None:
+				try:
+					prefer_single_row_odd = bool(odd_row_var.get())
+				except Exception:
+					prefer_single_row_odd = True
+			self.tiles_x, self.tiles_y = calculate_optimal_grid(
+				len(self.app.gif_frames),
+				prefer_single_row_odd=prefer_single_row_odd
+			)
 			
 			# Textur generieren (wie beim Export)
 			bg_color = self.app.bg_color

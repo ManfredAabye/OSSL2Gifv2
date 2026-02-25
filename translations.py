@@ -80,6 +80,7 @@ translations = {
         'scene_media_player': 'Mediaplayer',
         'scene_gif_edit': 'GIF-Bearbeitung',
         'scene_texture_edit': 'Textur-Bearbeitung',
+        'odd_frames_single_row': 'Ungerade einreihig',
         'tt_media_playrate_label': 'Abspielgeschwindigkeit in Prozent (10-500%, wobei 100% normal ist)',
         # Tastaturkürzel
         'key_ctrl': 'Strg',
@@ -229,6 +230,7 @@ translations = {
         'scene_media_player': 'Media Player',
         'scene_gif_edit': 'GIF Editing',
         'scene_texture_edit': 'Texture Editing',
+        'odd_frames_single_row': 'Odd frames single row',
         # Keyboard Shortcuts
         'key_ctrl': 'Ctrl',
         'key_space': 'Space',
@@ -386,6 +388,8 @@ translations = {
         'scene_media_player': 'Lecteur média',
         'scene_gif_edit': 'Édition GIF',
         'scene_texture_edit': 'Édition texture',
+        'odd_frames_single_row': 'Cadres impairs en une seule ligne',
+        # Raccourcis clavier
         'key_ctrl': 'Ctrl',
         'key_space': 'Barre d\'espace',
         'key_left': '←',
@@ -526,6 +530,7 @@ translations = {
         'scene_media_player': 'Reproductor multimedia',
         'scene_gif_edit': 'Edición GIF',
         'scene_texture_edit': 'Edición de textura',
+        'odd_frames_single_row': 'Fotogramas impares en una sola fila',
         # Atajos de teclado
         'key_ctrl': 'Ctrl',
         'key_space': 'Espacio',
@@ -667,6 +672,7 @@ translations = {
         'scene_media_player': 'Mediaspeler',
         'scene_gif_edit': 'GIF-bewerking',
         'scene_texture_edit': 'Textuurbewerking',
+        'odd_frames_single_row': 'Oneven frames in één rij',
         # Toetsenbordsneltoetsen
         'key_ctrl': 'Ctrl',
         'key_space': 'Spatiebalk',
@@ -808,6 +814,7 @@ translations = {
         'scene_media_player': 'Mediaspelare',
         'scene_gif_edit': 'GIF-redigering',
         'scene_texture_edit': 'Texturredigering',
+        'odd_frames_single_row': 'Udda bilder i en rad',
         # Tangentbordsgenvagar
         'key_ctrl': 'Ctrl',
         'key_space': 'Mellanslag',
@@ -950,6 +957,7 @@ translations = {
         'scene_media_player': 'Odtwarzacz multimediów',
         'scene_gif_edit': 'Edycja GIF',
         'scene_texture_edit': 'Edycja tekstury',
+        'odd_frames_single_row': 'Nieparzyste klatki w jednym rzędzie',
         # Skróty klawisowe
         'key_ctrl': 'Ctrl',
         'key_space': 'Spacja',
@@ -1091,6 +1099,7 @@ translations = {
         'scene_media_player': 'Reprodutor de mídia',
         'scene_gif_edit': 'Edição de GIF',
         'scene_texture_edit': 'Edição de textura',
+        'odd_frames_single_row': 'Quadros ímpares em uma linha',
         # Atalhos de teclado
         'key_ctrl': 'Ctrl',
         'key_space': 'Espaço',
@@ -1232,6 +1241,7 @@ translations = {
         'scene_media_player': 'Lettore multimediale',
         'scene_gif_edit': 'Modifica GIF',
         'scene_texture_edit': 'Modifica texture',
+        'odd_frames_single_row': 'Fotogrammi dispari in una riga',
         # Scorciatoie da tastiera
         'key_ctrl': 'Ctrl',
         'key_space': 'Spazio',
@@ -1373,6 +1383,7 @@ translations = {
         'scene_media_player': 'Медиаплеер',
         'scene_gif_edit': 'Редактирование GIF',
         'scene_texture_edit': 'Редактирование текстуры',
+        'odd_frames_single_row': 'Нечетные кадры в одну строку',
         # Сочетания клавиш
         'key_ctrl': 'Ctrl',
         'key_space': 'Пробел',
@@ -1510,6 +1521,7 @@ translations = {
         'scene_media_player': 'Медіаплеєр',
         'scene_gif_edit': 'Редагування GIF',
         'scene_texture_edit': 'Редагування текстури',
+        'odd_frames_single_row': 'Непарні кадри в один рядок',
         # Скорочення клавіатури
         'key_ctrl': 'Ctrl',
         'key_space': 'Пробіл',
@@ -1651,6 +1663,7 @@ translations = {
         'scene_media_player': 'メディアプレーヤー',
         'scene_gif_edit': 'GIF編集',
         'scene_texture_edit': 'テクスチャ編集',
+        'odd_frames_single_row': '奇数フレームを1行に',
         # キーボードショートカット
         'key_ctrl': 'Ctrl',
         'key_space': 'スペース',
@@ -1792,6 +1805,7 @@ translations = {
         'scene_media_player': '媒体播放器',
         'scene_gif_edit': 'GIF编辑',
         'scene_texture_edit': '纹理编辑',
+        'odd_frames_single_row': '奇数帧单行',
         # 键盘快捷键
         'key_ctrl': 'Ctrl',
         'key_space': '空格',

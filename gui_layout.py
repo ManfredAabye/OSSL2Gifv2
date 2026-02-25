@@ -22,7 +22,7 @@ def normalize_label_text(text: str) -> str:
 def create_menubar(self):
 	"""Erstellt die Menu Bar (Menüleiste) oben im Fenster.
 	
-	Die Menu Bar enthält die Hauptmenüs: File, Edit, View, Groups, Help.
+	Die Menu Bar enthält die Hauptmenüs: File, Edit, View, Script, Groups, Help.
 	Nicht zu verwechseln mit der File Toolbar (Button-Leiste im File-Group).
 	"""
 	menubar = tk.Menu(self.root)
@@ -111,6 +111,14 @@ def create_menubar(self):
 		                         command=lambda lc=lang_code: self._change_language_menu(lc))
 	
 	edit_menu.add_cascade(label=f"🌐 {tr('language', self.lang) or 'Sprache'}", menu=lang_submenu)
+
+	# Layout-Verhalten für ungerade Frame-Zahlen
+	if hasattr(self, 'odd_frames_single_row_var') and self.odd_frames_single_row_var is not None:
+		edit_menu.add_checkbutton(
+			label=f"🧩 {tr('odd_frames_single_row', self.lang) or 'Ungerade einreihig'}",
+			variable=self.odd_frames_single_row_var,
+			command=self._on_odd_row_layout_toggle
+		)
 	
 	# Theme Submenü (nur wenn ttkbootstrap verfügbar)
 	try:
@@ -166,6 +174,32 @@ def create_menubar(self):
 	media_menu.add_command(label=f"⏮ {tr('prev_frame', self.lang) or 'Zurück'}", command=self.step_backward, accelerator=tr('key_left', self.lang) or '←')
 	media_menu.add_command(label=f"⏭ {tr('next_frame', self.lang) or 'Vor'}", command=self.step_forward, accelerator=tr('key_right', self.lang) or '→')
 	menubar.add_cascade(label=f"🎬 {tr('media', self.lang) or 'Media'}", menu=media_menu)
+
+	# Skript-Menü (LSL-Animation)
+	script_menu = tk.Menu(menubar, tearoff=0)
+	script_menu.config(bg='#2d2d2d', fg='#ffffff', activebackground='#4a4a4a', activeforeground='#ffffff')  # type: ignore
+
+	script_menu.add_command(
+		label=f"🧾 {tr('export_lsl', self.lang) or 'LSL exportieren'} (Enhanced)",
+		command=self.export_lsl
+	)
+	script_menu.add_command(
+		label="📜 LSL exportieren (Legacy)",
+		command=self.export_lsl_legacy
+	)
+	script_menu.add_separator()
+
+	script_menu.add_checkbutton(label="LOOP", variable=self.lsl_effect_loop_var)
+	script_menu.add_checkbutton(label="SMOOTH", variable=self.lsl_effect_smooth_var)
+	script_menu.add_checkbutton(label="REVERSE", variable=self.lsl_effect_reverse_var)
+	script_menu.add_checkbutton(label="PING_PONG", variable=self.lsl_effect_ping_pong_var)
+	script_menu.add_separator()
+
+	script_menu.add_radiobutton(label="SLIDE", value="SLIDE", variable=self.lsl_movement_var)
+	script_menu.add_radiobutton(label="ROTATE", value="ROTATE", variable=self.lsl_movement_var)
+	script_menu.add_radiobutton(label="SCALE", value="SCALE", variable=self.lsl_movement_var)
+
+	menubar.add_cascade(label="🧾 Skript", menu=script_menu)
 	
 	# Gruppen-Menü
 	groups_menu = tk.Menu(menubar, tearoff=0)

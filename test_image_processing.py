@@ -1,7 +1,7 @@
 import unittest
 from PIL import Image
 import numpy as np
-from image_processing import apply_effects
+from image_processing import apply_effects, calculate_optimal_grid
 
 from typing import Any, Optional
 
@@ -61,6 +61,10 @@ class TestImageProcessing(unittest.TestCase):
         out = apply_effects(self.dummy, self.img.copy(), "gif")
         arr = np.array(out)
         self.assertTrue((arr[...,0] == arr[...,1]).all() and (arr[...,1] == arr[...,2]).all())
+
+    def test_calculate_optimal_grid_compact_for_odd_when_disabled(self):
+        self.assertEqual(calculate_optimal_grid(5, prefer_single_row_odd=True), (5, 1))
+        self.assertEqual(calculate_optimal_grid(5, prefer_single_row_odd=False), (3, 2))
 
 if __name__ == "__main__":
     unittest.main()

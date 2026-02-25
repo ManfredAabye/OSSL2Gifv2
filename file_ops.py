@@ -27,6 +27,14 @@ from exceptions import (
 
 logger = get_logger(__name__)
 
+def _prefer_single_row_odd(self: Any) -> bool:
+	try:
+		if hasattr(self, 'odd_frames_single_row_var') and self.odd_frames_single_row_var is not None:
+			return bool(self.odd_frames_single_row_var.get())
+	except Exception:
+		pass
+	return True
+
 def load_gif_from_path(self: Any, dropped_path: str) -> bool:
 	"""Lädt ein GIF aus einem gedroppten Dateipfad oder aus einem Ordner (erstes GIF)."""
 	if not dropped_path:
@@ -482,24 +490,31 @@ def save_texture(self: Any) -> None:
 	name = "texture"
 	if self.gif_image and hasattr(self.gif_image, 'filename'):
 		name = os.path.splitext(os.path.basename(self.gif_image.filename))[0]
+	name = str(name).replace(";", "_")
 	
 	# Versuche Tile-Informationen zu extrahieren oder berechne sie neu
 	try:
 		# Wenn die Textur nicht optimiert wurde, berechne Tiles optimal
-		default_x, default_y = calculate_optimal_grid(len(self.gif_frames))
+		default_x, default_y = calculate_optimal_grid(len(self.gif_frames), prefer_single_row_odd=_prefer_single_row_odd(self))
 		tiles_x = getattr(self, 'tiles_x', default_x)
 		tiles_y = getattr(self, 'tiles_y', default_y)
 	except:
-		tiles_x, tiles_y = calculate_optimal_grid(len(self.gif_frames))
+		tiles_x, tiles_y = calculate_optimal_grid(len(self.gif_frames), prefer_single_row_odd=_prefer_single_row_odd(self))
 	
 	speed_val = self.framerate_var.get()
-	speed = f"{speed_val};0"
+	start_val = 0
+	effect_tokens = _get_lsl_default_effect_tokens(self)
+	movement_token = _get_lsl_default_movement(self)
+	if not effect_tokens:
+		effect_tokens = ["LOOP"]
+	anim_tokens = [name, str(tiles_x), str(tiles_y), str(speed_val), str(start_val)] + effect_tokens + [movement_token]
+	default_texture_filename = "_".join(anim_tokens)
 	ext = self.export_format_var.get().lower()
 	defext = f".{ext}"
 	filetypes = [(ext.upper(), f"*.{ext}") for ext in ["png", "jpg", "bmp"]]
 	file = filedialog.asksaveasfilename(
 		defaultextension=defext, 
-		initialfile=f"{name};{tiles_x};{tiles_y};{speed}.{ext}", 
+		initialfile=f"{default_texture_filename}.{ext}", 
 		filetypes=filetypes
 	)
 	if not file:
@@ -596,12 +611,12 @@ def export_lsl(self: Any) -> None:
 		return
 	logger.info("Starting LSL script export")
 	frame_count = self.frame_count
-	tiles_x, tiles_y = calculate_optimal_grid(frame_count)
+	tiles_x, tiles_y = calculate_optimal_grid(frame_count, prefer_single_row_odd=_prefer_single_row_odd(self))
 	name = "texture"
 	if self.gif_image and hasattr(self.gif_image, 'filename'):
 		name = os.path.splitext(os.path.basename(self.gif_image.filename))[0]
 	speed = 10.0
-	lsl = generate_lsl_script(self, name, tiles_x, tiles_y, speed)
+	lsl = generate_lsl_script_v2(self, name, tiles_x, tiles_y, speed)
 	file = filedialog.asksaveasfilename(defaultextension=".lsl", initialfile=f"{name}.lsl", filetypes=[("LSL", "*.lsl"), ("Text", "*.txt")])
 	if not file:
 		logger.debug("LSL export cancelled by user")
@@ -629,7 +644,248 @@ def export_lsl(self: Any) -> None:
 		messagebox.showerror("Fehler", str(e))
 		raise LSLExportError(error_msg) from e
 
+def export_lsl_legacy(self: Any) -> None:
+	"""Exportiert das Legacy-LSL-Script (nur ; Format) für Abwärtskompatibilität."""
+	if not self.gif_frames:
+		messagebox.showerror("Fehler", "Kein GIF geladen.")
+		return
+	logger.info("Starting legacy LSL script export")
+	frame_count = self.frame_count
+	tiles_x, tiles_y = calculate_optimal_grid(frame_count, prefer_single_row_odd=_prefer_single_row_odd(self))
+	name = "texture"
+	if self.gif_image and hasattr(self.gif_image, 'filename'):
+		name = os.path.splitext(os.path.basename(self.gif_image.filename))[0]
+	speed = 10.0
+	lsl = generate_lsl_script_legacy(self, name, tiles_x, tiles_y, speed)
+	file = filedialog.asksaveasfilename(
+		defaultextension=".lsl",
+		initialfile=f"{name}_legacy.lsl",
+		filetypes=[("LSL", "*.lsl"), ("Text", "*.txt")]
+	)
+	if not file:
+		logger.debug("Legacy LSL export cancelled by user")
+		return
+	logger.info(f"Saving legacy LSL script to: {file}")
+	try:
+		with open(file, "w", encoding="utf-8") as f:
+			f.write(lsl)
+		logger.info(f"Legacy LSL script exported successfully: {file}")
+		if hasattr(self, 'status') and self.status:
+			self.status.config(text=tr('status_lsl_exported', self.lang) or "LSL-Skript exportiert.")
+	except FileNotFoundError as e:
+		error_msg = f"Could not save legacy LSL script: {file}"
+		logger.error(error_msg, exc_info=True)
+		messagebox.showerror("Fehler", str(e))
+		raise LSLExportError(error_msg) from e
+	except IOError as e:
+		error_msg = f"IO error when saving legacy LSL script: {file}"
+		logger.error(error_msg, exc_info=True)
+		messagebox.showerror("Fehler", str(e))
+		raise LSLExportError(error_msg) from e
+	except Exception as e:
+		error_msg = f"Error exporting legacy LSL script: {str(e)}"
+		logger.error(error_msg, exc_info=True)
+		messagebox.showerror("Fehler", str(e))
+		raise LSLExportError(error_msg) from e
+
+def _get_app_version() -> str:
+	"""Liefert die App-Version ohne harten Modulimport zur Import-Zeit (verhindert Circular Imports)."""
+	try:
+		import main as app_main
+		version = getattr(app_main, "Version", None)
+		if isinstance(version, str) and version.strip():
+			return version
+	except Exception:
+		pass
+	return "2.2.0"
+
 def generate_lsl_script(self: Any, name: str, tiles_x: int, tiles_y: int, speed: float) -> str:
-	"""Generiert ein LSL-Script für Texture-Animation mit den gegebenen Parametern."""
+	"""Kompatibilitäts-Wrapper: liefert das Legacy-LSL-Script."""
+	return generate_lsl_script_legacy(self, name, tiles_x, tiles_y, speed)
+
+def _get_lsl_default_effect_tokens(self: Any) -> list[str]:
+	effects: list[str] = []
+	if not hasattr(self, 'lsl_effect_loop_var') or self.lsl_effect_loop_var.get():
+		effects.append("LOOP")
+	if hasattr(self, 'lsl_effect_smooth_var') and self.lsl_effect_smooth_var.get():
+		effects.append("SMOOTH")
+	if hasattr(self, 'lsl_effect_reverse_var') and self.lsl_effect_reverse_var.get():
+		effects.append("REVERSE")
+	if hasattr(self, 'lsl_effect_ping_pong_var') and self.lsl_effect_ping_pong_var.get():
+		effects.append("PING_PONG")
+	return effects
+
+def _get_lsl_default_movement(self: Any) -> str:
+	if hasattr(self, 'lsl_movement_var') and self.lsl_movement_var is not None:
+		movement = str(self.lsl_movement_var.get()).strip().upper()
+		if movement in {"SLIDE", "ROTATE", "SCALE"}:
+			return movement
+	return "SLIDE"
+
+def generate_lsl_script_v2(self: Any, name: str, tiles_x: int, tiles_y: int, speed: float) -> str:
+	"""Generiert ein erweitertes LSL-Script mit Semikolon- und Unterstrich-Kompatibilität."""
+	version = _get_app_version()
 	length = tiles_x * tiles_y
-	return f'''// LSL Texture Animation Script\n// Generated by OSSL2Gif\n// Texture: {name};{tiles_x};{tiles_y};{speed}\n\ninteger animOn = TRUE;\nlist effects = [LOOP];\ninteger movement = 0;\ninteger face = ALL_SIDES;\ninteger sideX = {tiles_x};\ninteger sideY = {tiles_y};\nfloat start = 0.0;\nfloat length = {length};\nfloat speed = {speed};\n\ninitAnim() {{\n    if(animOn) {{\n        integer effectBits;\n        integer i;\n        for(i = 0; i < llGetListLength(effects); i++) {{\n            effectBits = (effectBits | llList2Integer(effects,i));\n        }}\n        integer params = (effectBits|movement);\n        llSetTextureAnim(ANIM_ON|params,face,sideX,sideY,start,length,speed);\n    }}\n    else {{\n        llSetTextureAnim(0,face,sideX,sideY,start,length,speed);\n    }}\n}}\n\nfetch() {{\n     string texture = llGetInventoryName(INVENTORY_TEXTURE,0);\n            llSetTexture(texture,face);\n            // llParseString2List braucht als Trennzeichen eine Liste!\n            list data  = llParseString2List(texture,[";"],[]);\n            string X = llList2String(data,1);\n            string Y = llList2String(data,2);\n            string Z = llList2String(data,3);\n            sideX = (integer) X;\n            sideY = (integer) Y;\n            speed = (float) Z;\n            length = (float)(sideX * sideY);\n            if (speed) \n                initAnim();\n}}\n\ndefault\n{{\n    state_entry()\n    {{\n        llSetTextureAnim(FALSE, face, 0, 0, 0.0, 0.0, 1.0);\n        fetch();\n    }}\n    changed(integer what)\n    {{\n        if (what & CHANGED_INVENTORY)\n        {{\n            fetch();\n        }}\n    }}\n}}\n'''
+	default_effects = _get_lsl_default_effect_tokens(self)
+	default_effects_lsl = ", ".join(default_effects) if default_effects else "LOOP"
+	default_movement = _get_lsl_default_movement(self)
+	movement_map = {
+		"SLIDE": "0",
+		"ROTATE": "ROTATE",
+		"SCALE": "SCALE",
+	}
+	default_movement_lsl = movement_map.get(default_movement, "0")
+	return f'''// LSL Texture Animation Script (Enhanced)
+// Generated by OSSL2Gif {version}
+// Legacy format: {name};{tiles_x};{tiles_y};{speed}
+// New format: {name}_{tiles_x}_{tiles_y}_{speed}_0_{'_'.join(default_effects)}_{default_movement}
+
+integer animOn = TRUE;
+list defaultEffects = [{default_effects_lsl}];
+integer defaultMovement = {default_movement_lsl}; // 0=SLIDE, ROTATE, SCALE
+integer face = ALL_SIDES;
+
+integer sideX = {tiles_x};
+integer sideY = {tiles_y};
+float start = 0.0;
+float length = {length};
+float speed = {speed};
+
+list buildEffects(list tokens)
+{{
+	integer i;
+	list resolved = [];
+	integer count = llGetListLength(tokens);
+
+	for(i = 0; i < count; i++)
+	{{
+		string token = llToUpper(llStringTrim(llList2String(tokens, i), STRING_TRIM));
+		if(token == "PING" && (i + 1) < count)
+		{{
+			string nextToken = llToUpper(llStringTrim(llList2String(tokens, i + 1), STRING_TRIM));
+			if(nextToken == "PONG")
+			{{
+				resolved += [PING_PONG];
+				i++;
+				jump continue_effects;
+			}}
+		}}
+		if(token == "LOOP")
+			resolved += [LOOP];
+		else if(token == "SMOOTH")
+			resolved += [SMOOTH];
+		else if(token == "REVERSE")
+			resolved += [REVERSE];
+		else if(token == "PING_PONG")
+			resolved += [PING_PONG];
+
+		@continue_effects;
+	}}
+
+	if(llGetListLength(resolved) == 0)
+	{{
+		return defaultEffects;
+	}}
+	return resolved;
+}}
+
+integer buildMovement(list tokens)
+{{
+	integer i;
+	integer count = llGetListLength(tokens);
+
+	for(i = 0; i < count; i++)
+	{{
+		string token = llToUpper(llStringTrim(llList2String(tokens, i), STRING_TRIM));
+		if(token == "ROTATE")
+			return ROTATE;
+		if(token == "SCALE")
+			return SCALE;
+		if(token == "SLIDE")
+			return 0;
+	}}
+	return defaultMovement;
+}}
+
+initAnim(list effects, integer movement)
+{{
+	if(animOn)
+	{{
+		integer effectBits = 0;
+		integer i;
+		for(i = 0; i < llGetListLength(effects); i++)
+		{{
+			effectBits = effectBits | llList2Integer(effects, i);
+		}}
+		llSetTextureAnim(ANIM_ON | effectBits | movement, face, sideX, sideY, start, length, speed);
+	}}
+	else
+	{{
+		llSetTextureAnim(0, face, sideX, sideY, start, length, speed);
+	}}
+}}
+
+fetch()
+{{
+	string texture = llGetInventoryName(INVENTORY_TEXTURE, 0);
+	if(texture == "")
+		return;
+
+	llSetTexture(texture, face);
+
+	list raw = llParseStringKeepNulls(texture, [".", ";", "_"], []);
+
+	if(llGetListLength(raw) < 4)
+	{{
+		llOwnerSay("Ungültiges Texturformat. Erwartet: name;X;Y;FPS oder name_X_Y_FPS_...");
+		return;
+	}}
+
+	sideX = (integer)llList2String(raw, 1);
+	sideY = (integer)llList2String(raw, 2);
+	speed = (float)llList2String(raw, 3);
+
+	if(llGetListLength(raw) > 4)
+	{{
+		start = (float)llList2String(raw, 4);
+	}}
+	else
+	{{
+		start = 0.0;
+	}}
+
+	length = (float)(sideX * sideY);
+
+	list optionalTokens = llList2List(raw, 5, -1);
+	list effects = buildEffects(optionalTokens);
+	integer movement = buildMovement(optionalTokens);
+
+	if(sideX > 0 && sideY > 0)
+	{{
+		initAnim(effects, movement);
+	}}
+}}
+
+default
+{{
+	state_entry()
+	{{
+		llSetTextureAnim(FALSE, face, 0, 0, 0.0, 0.0, 1.0);
+		fetch();
+	}}
+
+	changed(integer what)
+	{{
+		if(what & CHANGED_INVENTORY)
+		{{
+			fetch();
+		}}
+	}}
+}}
+'''
+
+def generate_lsl_script_legacy(self: Any, name: str, tiles_x: int, tiles_y: int, speed: float) -> str:
+	"""Generiert ein LSL-Script für Texture-Animation mit den gegebenen Parametern."""
+	version = _get_app_version()
+	length = tiles_x * tiles_y
+	return f'''// LSL Texture Animation Script\n// Generated by OSSL2Gif {version}\n// Texture: {name};{tiles_x};{tiles_y};{speed}\n\ninteger animOn = TRUE;\nlist effects = [LOOP];\ninteger movement = 0;\ninteger face = ALL_SIDES;\ninteger sideX = {tiles_x};\ninteger sideY = {tiles_y};\nfloat start = 0.0;\nfloat length = {length};\nfloat speed = {speed};\n\ninitAnim() {{\n    if(animOn) {{\n        integer effectBits;\n        integer i;\n        for(i = 0; i < llGetListLength(effects); i++) {{\n            effectBits = (effectBits | llList2Integer(effects,i));\n        }}\n        integer params = (effectBits|movement);\n        llSetTextureAnim(ANIM_ON|params,face,sideX,sideY,start,length,speed);\n    }}\n    else {{\n        llSetTextureAnim(0,face,sideX,sideY,start,length,speed);\n    }}\n}}\n\nfetch() {{\n     string texture = llGetInventoryName(INVENTORY_TEXTURE,0);\n            llSetTexture(texture,face);\n            // llParseString2List braucht als Trennzeichen eine Liste!\n            list data  = llParseString2List(texture,[";"],[]);\n            string X = llList2String(data,1);\n            string Y = llList2String(data,2);\n            string Z = llList2String(data,3);\n            sideX = (integer) X;\n            sideY = (integer) Y;\n            speed = (float) Z;\n            length = (float)(sideX * sideY);\n            if (speed) \n                initAnim();\n}}\n\ndefault\n{{\n    state_entry()\n    {{\n        llSetTextureAnim(FALSE, face, 0, 0, 0.0, 0.0, 1.0);\n        fetch();\n    }}\n    changed(integer what)\n    {{\n        if (what & CHANGED_INVENTORY)\n        {{\n            fetch();\n        }}\n    }}\n}}\n'''

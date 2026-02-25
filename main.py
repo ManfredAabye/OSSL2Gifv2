@@ -15,7 +15,7 @@ from config import load_config, save_config
 from translations import tr
 from gui_layout import build_layout, create_effects_panel, normalize_label_text
 from image_processing import apply_effects, show_gif_frame, show_texture
-from file_ops import load_gif, save_gif, save_texture, load_texture, export_lsl, generate_lsl_script
+from file_ops import load_gif, save_gif, save_texture, load_texture, export_lsl, export_lsl_legacy
 from events import reset_settings, change_language, on_maxframes_changed, add_selected_frame_to_texture, choose_bg_color, set_transparent_bg, on_bg_transparency_changed, apply_background_from_config
 from logging_config import get_logger
 try:
@@ -84,7 +84,7 @@ except Exception as e:
     DEFAULT_LANGUAGE = 'unknown'
 
 LANGUAGES = ['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt', 'uk', 'ja', 'zh']
-Version = "2.1.3"
+Version = "2.2.0"
 
 # ============================================================================
 # FENSTERGRÖSSENEINSTELLUNGEN - HIER KÖNNEN WERTE MANUELL ANGEPASST WERDEN
@@ -301,6 +301,12 @@ class ModernApp:
         
         self.export_format_label = None
         self.export_format_var = tk.StringVar(value='PNG')
+        self.odd_frames_single_row_var = tk.BooleanVar(value=True)
+        self.lsl_effect_loop_var = tk.BooleanVar(value=True)
+        self.lsl_effect_smooth_var = tk.BooleanVar(value=False)
+        self.lsl_effect_reverse_var = tk.BooleanVar(value=False)
+        self.lsl_effect_ping_pong_var = tk.BooleanVar(value=False)
+        self.lsl_movement_var = tk.StringVar(value='SLIDE')
         self.media_playrate_var = None  # Wird in gui_layout.py gesetzt
         self.media_playrate_label = None  # Für Media-Abspielrate-Label (Tooltip/Übersetzung)
         self.menubar = None  # Menu Bar (Menüleiste oben: File, Edit, View, Groups, Help) - wird in gui_layout.py create_menubar() gesetzt
@@ -549,7 +555,13 @@ class ModernApp:
             'show_master_settings': self.show_master_var.get(),
             'show_media': self.show_media_var.get(),
             'show_file': self.show_file_var.get(),
-            'show_status': self.show_status_var.get()
+            'show_status': self.show_status_var.get(),
+            'odd_frames_single_row': self.odd_frames_single_row_var.get() if hasattr(self, 'odd_frames_single_row_var') and self.odd_frames_single_row_var is not None else True,
+            'lsl_effect_loop': self.lsl_effect_loop_var.get() if hasattr(self, 'lsl_effect_loop_var') and self.lsl_effect_loop_var is not None else True,
+            'lsl_effect_smooth': self.lsl_effect_smooth_var.get() if hasattr(self, 'lsl_effect_smooth_var') and self.lsl_effect_smooth_var is not None else False,
+            'lsl_effect_reverse': self.lsl_effect_reverse_var.get() if hasattr(self, 'lsl_effect_reverse_var') and self.lsl_effect_reverse_var is not None else False,
+            'lsl_effect_ping_pong': self.lsl_effect_ping_pong_var.get() if hasattr(self, 'lsl_effect_ping_pong_var') and self.lsl_effect_ping_pong_var is not None else False,
+            'lsl_movement': self.lsl_movement_var.get() if hasattr(self, 'lsl_movement_var') and self.lsl_movement_var is not None else 'SLIDE',
         }
 
     def save_config(self):
@@ -598,6 +610,20 @@ class ModernApp:
             self.export_format_var.set(config['export_format'])
         if 'maxframes' in config:
             self.maxframes_var.set(config['maxframes'])
+        if 'odd_frames_single_row' in config and hasattr(self, 'odd_frames_single_row_var') and self.odd_frames_single_row_var is not None:
+            self.odd_frames_single_row_var.set(bool(config['odd_frames_single_row']))
+        if 'lsl_effect_loop' in config and hasattr(self, 'lsl_effect_loop_var') and self.lsl_effect_loop_var is not None:
+            self.lsl_effect_loop_var.set(bool(config['lsl_effect_loop']))
+        if 'lsl_effect_smooth' in config and hasattr(self, 'lsl_effect_smooth_var') and self.lsl_effect_smooth_var is not None:
+            self.lsl_effect_smooth_var.set(bool(config['lsl_effect_smooth']))
+        if 'lsl_effect_reverse' in config and hasattr(self, 'lsl_effect_reverse_var') and self.lsl_effect_reverse_var is not None:
+            self.lsl_effect_reverse_var.set(bool(config['lsl_effect_reverse']))
+        if 'lsl_effect_ping_pong' in config and hasattr(self, 'lsl_effect_ping_pong_var') and self.lsl_effect_ping_pong_var is not None:
+            self.lsl_effect_ping_pong_var.set(bool(config['lsl_effect_ping_pong']))
+        if 'lsl_movement' in config and hasattr(self, 'lsl_movement_var') and self.lsl_movement_var is not None:
+            movement = str(config['lsl_movement']).upper()
+            if movement in {'SLIDE', 'ROTATE', 'SCALE'}:
+                self.lsl_movement_var.set(movement)
         
         # Fenster-Geometrie aus config wiederherstellen (z.B. "1200x800+100+50")
         if 'window_geometry' in config and config['window_geometry']:
@@ -990,20 +1016,21 @@ class ModernApp:
             self.maxframes_label.config(text=f"🖼 {tr('max_images', l) or 'Max. Bilder:'}")
         
         # Menu Bar (Menüleiste oben) aktualisieren
-        if hasattr(self, 'menubar') and self.menubar is not None:
-            # Alte Menüleiste vollständig entfernen
-            try:
-                self.menubar.destroy()
-            except:
-                pass
-            self.root.config(menu=None)
-            # Wichtig: root.update() statt update_idletasks() um sicherzustellen,
-            # dass das Menü vollständig entfernt wird
-            self.root.update()
-            # Neues Menü mit aktualisierter Sprache erstellen
+        if hasattr(self, 'root') and self.root is not None:
+            old_menubar = getattr(self, 'menubar', None)
+
+            # Neues Menü direkt erstellen und zuweisen (ohne Zwischenzustand menu=None).
+            # Das verhindert unter Linux/X11 ein sporadisch verschwindendes Menü nach Sprachwechsel.
             from gui_layout import create_menubar
             create_menubar(self)
-            # Layout aktualisieren
+
+            # Altes Menü erst danach entsorgen, sobald das neue aktiv ist.
+            if old_menubar is not None and old_menubar is not self.menubar:
+                try:
+                    self.root.after_idle(old_menubar.destroy)
+                except Exception:
+                    pass
+
             self.root.update_idletasks()
 
 
@@ -1282,6 +1309,14 @@ Python {'.'.join(map(str, __import__('sys').version_info[:3]))}
     def _change_export_format_menu(self, format_name):
         """Ändert das Exportformat über das Menü."""
         self.export_format_var.set(format_name)
+
+    def _on_odd_row_layout_toggle(self):
+        """Aktualisiert die Texturvorschau nach Umschalten der Ungerade-Layout-Regel."""
+        try:
+            if hasattr(self, 'show_texture'):
+                self.show_texture()
+        except Exception as e:
+            logger.debug(f"Failed to refresh texture after odd-row toggle: {e}", exc_info=False)
     
     def _toggle_gif_preview(self):
         """Toggle GIF-Vorschau ein/aus."""
@@ -1475,7 +1510,11 @@ Python {'.'.join(map(str, __import__('sys').version_info[:3]))}
     def export_lsl(self):
         export_lsl(self)
 
+    def export_lsl_legacy(self):
+        export_lsl_legacy(self)
+
     def generate_lsl_script(self, name, tiles_x, tiles_y, speed):
+        from file_ops import generate_lsl_script
         return generate_lsl_script(self, name, tiles_x, tiles_y, speed)
 
 
