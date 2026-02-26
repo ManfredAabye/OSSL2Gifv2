@@ -6,11 +6,12 @@
 
 import math
 import os
+from datetime import datetime
 import tkinter as tk
 from io import BytesIO
 import glob
 from typing import Any, List, Optional
-from tkinter import filedialog, messagebox, ttk, simpledialog
+from tkinter import filedialog, ttk, simpledialog
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -26,6 +27,13 @@ from exceptions import (
 )
 
 logger = get_logger(__name__)
+
+def _set_status(self: Any, text: str) -> None:
+	if hasattr(self, 'status') and self.status:
+		self.status.config(text=text)
+
+def _lang(self: Any) -> str:
+	return str(getattr(self, 'lang', 'de'))
 
 def _prefer_single_row_odd(self: Any) -> bool:
 	try:
@@ -126,8 +134,8 @@ def import_frames_to_gif(self: Any) -> None:
 		if hasattr(self, 'status') and self.status:
 			self.status.config(text=tr('status_gif_created', self.lang) or "GIF aus Einzelbildern erstellt.")
 	except Exception as e:
-		from tkinter import messagebox
-		messagebox.showerror("Fehler", f"Fehler beim Importieren: {e}")
+		logger.error(f"Fehler beim Importieren: {e}", exc_info=True)
+		_set_status(self, f"Fehler beim Importieren: {e}")
 	finally:
 		if tempdir:
 			shutil.rmtree(tempdir)
@@ -169,14 +177,14 @@ def load_gif_from_clipboard(self: Any) -> None:
 		from PIL import ImageGrab
 	except Exception as e:
 		logger.error(f"Clipboard support unavailable: {e}", exc_info=True)
-		messagebox.showerror("Fehler", "Zwischenablage wird auf diesem System nicht unterstützt.")
+		_set_status(self, "Zwischenablage wird auf diesem System nicht unterstützt.")
 		return
 
 	try:
 		clipboard_data = ImageGrab.grabclipboard()
 	except Exception as e:
 		logger.error(f"Failed to read clipboard: {e}", exc_info=True)
-		messagebox.showerror("Fehler", f"Zwischenablage konnte nicht gelesen werden: {e}")
+		_set_status(self, f"Zwischenablage konnte nicht gelesen werden: {e}")
 		return
 
 	if isinstance(clipboard_data, list):
@@ -210,8 +218,6 @@ def load_gif_from_clipboard(self: Any) -> None:
 
 	if hasattr(self, 'status') and self.status:
 		self.status.config(text="Zwischenablage enthält kein GIF/Bild.")
-	else:
-		messagebox.showinfo("Hinweis", "Zwischenablage enthält kein GIF oder Bild.")
 
 def load_gif_from_url(self: Any, image_url: Optional[str] = None) -> None:
 	"""Lädt ein GIF/Bild von einer HTTP(S)-Adresse."""
@@ -229,7 +235,7 @@ def load_gif_from_url(self: Any, image_url: Optional[str] = None) -> None:
 	url = url.strip()
 	parsed = urlparse(url)
 	if parsed.scheme not in ('http', 'https') or not parsed.netloc:
-		messagebox.showerror("Fehler", "Ungültige Grafikadresse. Bitte http/https verwenden.")
+		_set_status(self, "Ungültige Grafikadresse. Bitte http/https verwenden.")
 		return
 
 	frames = []
@@ -239,7 +245,7 @@ def load_gif_from_url(self: Any, image_url: Optional[str] = None) -> None:
 			image_data = response.read()
 
 		if not image_data:
-			messagebox.showerror("Fehler", "Die angegebene Grafikadresse liefert keine Daten.")
+			_set_status(self, "Die angegebene Grafikadresse liefert keine Daten.")
 			return
 
 		image = Image.open(BytesIO(image_data))
@@ -250,19 +256,19 @@ def load_gif_from_url(self: Any, image_url: Optional[str] = None) -> None:
 		pass
 	except HTTPError as e:
 		logger.error(f"HTTP error loading image URL {url}: {e}", exc_info=True)
-		messagebox.showerror("Fehler", f"HTTP-Fehler beim Laden: {e.code}")
+		_set_status(self, f"HTTP-Fehler beim Laden: {e.code}")
 		return
 	except URLError as e:
 		logger.error(f"Network error loading image URL {url}: {e}", exc_info=True)
-		messagebox.showerror("Fehler", f"Netzwerkfehler beim Laden: {e.reason}")
+		_set_status(self, f"Netzwerkfehler beim Laden: {e.reason}")
 		return
 	except Exception as e:
 		logger.error(f"Failed to load image from URL {url}: {e}", exc_info=True)
-		messagebox.showerror("Fehler", f"Grafik konnte nicht geladen werden: {e}")
+		_set_status(self, f"Grafik konnte nicht geladen werden: {e}")
 		return
 
 	if not frames:
-		messagebox.showerror("Fehler", "Die Grafikadresse enthält kein lesbares Bild.")
+		_set_status(self, "Die Grafikadresse enthält kein lesbares Bild.")
 		return
 
 	self.gif_image = frames[0].copy()
@@ -290,23 +296,23 @@ def _load_gif_frames(self: Any, file: str) -> None:
 	except FileNotFoundError as e:
 		error_msg = f"File not found: {file}"
 		logger.error(error_msg, exc_info=True)
-		messagebox.showerror("Fehler", f"Datei nicht gefunden: {file}")
+		_set_status(self, f"Datei nicht gefunden: {file}")
 		raise ImageLoadError(error_msg) from e
 	except UnidentifiedImageError as e:
 		error_msg = f"File is not a valid or corrupted GIF: {file}"
 		logger.error(error_msg, exc_info=True)
-		messagebox.showerror("Fehler", f"Die Datei ist kein gültiges GIF oder beschädigt: {file}")
+		_set_status(self, f"Die Datei ist kein gültiges GIF oder beschädigt: {file}")
 		raise ImageLoadError(error_msg) from e
 	except EOFError:
 		pass
 	except MemoryError as e:
 		error_msg = f"Insufficient memory to load GIF: {file}"
 		logger.error(error_msg, exc_info=True)
-		messagebox.showerror("Fehler", "Nicht genügend Speicher zum Laden des GIFs.")
+		_set_status(self, "Nicht genügend Speicher zum Laden des GIFs.")
 		raise ImageLoadError(error_msg) from e
 	except Exception as e:
 		logger.error(f"Unknown error loading GIF {file}: {e}", exc_info=True)
-		messagebox.showerror("Fehler", f"Unbekannter Fehler beim Laden des GIFs: {e}")
+		_set_status(self, f"Unbekannter Fehler beim Laden des GIFs: {e}")
 		raise ImageLoadError(f"Failed to load GIF: {str(e)}") from e
 	
 	logger.info(f"Successfully loaded GIF with {len(frames)} frames from {file}")
@@ -323,7 +329,7 @@ def _load_gif_frames(self: Any, file: str) -> None:
 		except Exception as e:
 			error_msg = f"Failed to copy GIF frame: {type(e).__name__}: {e}"
 			logger.error(error_msg, exc_info=False)
-			messagebox.showerror(tr('error', self.lang) or "Error", tr('status_gif_corrupted', self.lang) or "GIF konnte nicht geladen werden.")
+			_set_status(self, tr('status_gif_corrupted', self.lang) or "GIF konnte nicht geladen werden.")
 			return
 	logger.debug(f"Loaded frames: {len(frames)}")
 	self.gif_frames = frames
@@ -391,7 +397,7 @@ def save_gif(self: Any) -> None:
 	if not self.gif_frames:
 		error_msg = "No GIF loaded for saving"
 		logger.warning(error_msg)
-		messagebox.showerror("Fehler", "Kein GIF geladen.")
+		_set_status(self, "GIF-Speichern nicht möglich: Kein GIF geladen.")
 		return
 	file = filedialog.asksaveasfilename(defaultextension=".gif", filetypes=[("GIF", "*.gif")])
 	if not file:
@@ -407,17 +413,17 @@ def save_gif(self: Any) -> None:
 	except FileNotFoundError as e:
 		error_msg = f"File could not be saved: {file}"
 		logger.error(error_msg, exc_info=True)
-		messagebox.showerror("Fehler", f"Datei konnte nicht gespeichert werden: {file}")
-		raise FileOperationError(error_msg) from e
+		_set_status(self, f"GIF-Speichern fehlgeschlagen: Datei konnte nicht gespeichert werden: {file}")
+		return
 	except MemoryError as e:
 		error_msg = f"Insufficient memory to save GIF: {file}"
 		logger.error(error_msg, exc_info=True)
-		messagebox.showerror("Fehler", "Nicht genügend Speicher zum Speichern des GIFs.")
-		raise FileOperationError(error_msg) from e
+		_set_status(self, "GIF-Speichern fehlgeschlagen: Nicht genügend Speicher.")
+		return
 	except Exception as e:
 		logger.error(f"Error saving GIF {file}: {e}", exc_info=True)
-		messagebox.showerror("Fehler", f"Fehler beim Speichern des GIFs: {e}")
-		raise FileOperationError(f"Failed to save GIF: {str(e)}") from e
+		_set_status(self, f"GIF-Speichern fehlgeschlagen: {e}")
+		return
 
 def load_texture(self: Any) -> None:
 	"""Lädt eine Textur-Datei (PNG, JPG, BMP, etc.) und wendet alle Texture-Effekte an."""
@@ -470,7 +476,7 @@ def load_texture(self: Any) -> None:
 def save_texture(self: Any) -> None:
 	"""Speichert die aktuell generierte Texture."""
 	if not hasattr(self, 'texture_image') or self.texture_image is None:
-		messagebox.showerror("Fehler", "Keine Textur generiert. Bitte zuerst auf die Textur-Vorschau klicken.")
+		_set_status(self, "Textur-Speichern nicht möglich: Keine Textur generiert.")
 		return
 	
 	logger.info(f"Saving texture: {self.texture_image.size}")
@@ -501,14 +507,7 @@ def save_texture(self: Any) -> None:
 	except:
 		tiles_x, tiles_y = calculate_optimal_grid(len(self.gif_frames), prefer_single_row_odd=_prefer_single_row_odd(self))
 	
-	speed_val = self.framerate_var.get()
-	start_val = 0
-	effect_tokens = _get_lsl_default_effect_tokens(self)
-	movement_token = _get_lsl_default_movement(self)
-	if not effect_tokens:
-		effect_tokens = ["LOOP"]
-	anim_tokens = [name, str(tiles_x), str(tiles_y), str(speed_val), str(start_val)] + effect_tokens + [movement_token]
-	default_texture_filename = "_".join(anim_tokens)
+	default_texture_filename = name
 	ext = self.export_format_var.get().lower()
 	defext = f".{ext}"
 	filetypes = [(ext.upper(), f"*.{ext}") for ext in ["png", "jpg", "bmp"]]
@@ -536,10 +535,10 @@ def save_texture(self: Any) -> None:
 					zipf.writestr(f"frame_{idx+1:03d}.png", img_bytes.read())
 			logger.info(f"ZIP export saved successfully with {len(self.gif_frames)} frames: {file}")
 			if hasattr(self, 'status') and self.status:
-				self.status.config(text=tr('status_zip_saved', self.lang) or "GIF-Einzelbilder als ZIP gespeichert.")
+				self.status.config(text=tr('status_zip_saved', _lang(self)) or "GIF-Einzelbilder als ZIP gespeichert.")
 		except Exception as e:
 			logger.error(f"Error exporting ZIP: {e}", exc_info=True)
-			messagebox.showerror("Fehler", f"Fehler beim ZIP-Export: {e}")
+			_set_status(self, f"ZIP-Export fehlgeschlagen: {e}")
 		return
 	
 	# PNG/JPG/BMP-Export: Speichere optimierte Textur
@@ -575,39 +574,48 @@ def save_texture(self: Any) -> None:
 					
 					if transparency_ratio > 0.9:  # Mehr als 90% transparent
 						logger.warning(f"Texture has very high transparency: {transparency_ratio*100:.1f}% fully transparent pixels")
-						messagebox.showwarning(
-							"Warnung",
-							f"Die Texture ist zu {transparency_ratio*100:.1f}% durchsichtig.\n\n"
-							f"Der Second Life Viewer könnte eine Warnung zeigen.\n"
-							f"Stelle sicher, dass du einen nicht-transparenten Hintergrund verwenden möchtest."
-						)
+						_set_status(self, f"Warnung: Textur ist zu {transparency_ratio*100:.1f}% durchsichtig.")
 			except Exception as e:
 				logger.debug(f"Could not check alpha channel: {e}")
 		
 		img.save(file, format=fmt)
 		logger.info(f"Texture saved successfully: {file} ({img.size})")
+
+		texture_base_name = os.path.splitext(os.path.basename(file))[0]
+		notecard_content = generate_lsl_notecard(
+			texture_base_name,
+			tiles_x,
+			tiles_y,
+			float(self.framerate_var.get()) if hasattr(self, 'framerate_var') else 10.0,
+			_get_lsl_default_effect_tokens(self),
+			_get_lsl_default_movement(self),
+		)
+		notecard_file = os.path.join(os.path.dirname(file), f"{texture_base_name}.notecard")
+		with open(notecard_file, "w", encoding="utf-8") as f:
+			f.write(notecard_content)
 		
 		if hasattr(self, 'status') and self.status:
-			self.status.config(text=tr('status_saved', self.lang) or f"Textur gespeichert: {os.path.basename(file)}")
+			self.status.config(text=(tr('status_saved', _lang(self)) or "Textur gespeichert") + f": {os.path.basename(file)} | Notecard: {texture_base_name}.notecard")
 
 	
 	except FileNotFoundError as e:
 		logger.error(f"File not found when saving texture: {e}")
-		messagebox.showerror("Fehler", f"Speicherort nicht gefunden: {e}")
-		raise TextureGenerationError(f"Failed to save texture - file path not found: {str(e)}") from e
+		_set_status(self, f"Textur-Speichern fehlgeschlagen: Speicherort nicht gefunden: {e}")
+		return
 	except PermissionError as e:
 		logger.error(f"Permission denied when saving texture: {e}")
-		messagebox.showerror("Fehler", f"Berechtigung verweigert: {e}")
-		raise TextureGenerationError(f"Failed to save texture - permission denied: {str(e)}") from e
+		_set_status(self, f"Textur-Speichern fehlgeschlagen: Berechtigung verweigert: {e}")
+		return
 	except Exception as e:
 		logger.error(f"Error saving texture: {e}", exc_info=True)
-		messagebox.showerror("Fehler", f"Fehler beim Speichern: {e}")
-		raise TextureGenerationError(f"Failed to save texture: {str(e)}") from e
+		_set_status(self, f"Textur-Speichern fehlgeschlagen: {e}")
+		return
 
 def export_lsl(self: Any) -> None:
 	"""Exportiert ein LSL (Linden Scripting Language) Script für Texture-Animation in Second Life/OpenSim."""
 	if not self.gif_frames:
-		messagebox.showerror("Fehler", "Kein GIF geladen.")
+		if hasattr(self, 'status') and self.status:
+			self.status.config(text="LSL-Export nicht möglich: Kein GIF geladen.")
 		return
 	logger.info("Starting LSL script export")
 	frame_count = self.frame_count
@@ -615,9 +623,12 @@ def export_lsl(self: Any) -> None:
 	name = "texture"
 	if self.gif_image and hasattr(self.gif_image, 'filename'):
 		name = os.path.splitext(os.path.basename(self.gif_image.filename))[0]
-	speed = 10.0
+	try:
+		speed = float(self.framerate_var.get())
+	except Exception:
+		speed = 10.0
 	lsl = generate_lsl_script_v2(self, name, tiles_x, tiles_y, speed)
-	file = filedialog.asksaveasfilename(defaultextension=".lsl", initialfile=f"{name}.lsl", filetypes=[("LSL", "*.lsl"), ("Text", "*.txt")])
+	file = filedialog.asksaveasfilename(defaultextension=".lsl", initialfile="Texture-Animation-Script.lsl", filetypes=[("LSL", "*.lsl"), ("Text", "*.txt")])
 	if not file:
 		logger.debug("LSL export cancelled by user")
 		return
@@ -627,66 +638,25 @@ def export_lsl(self: Any) -> None:
 			f.write(lsl)
 		logger.info(f"LSL script exported successfully: {file}")
 		if hasattr(self, 'status') and self.status:
-			self.status.config(text=tr('status_lsl_exported', self.lang) or "LSL-Skript exportiert.")
+			self.status.config(text=tr('status_lsl_exported', _lang(self)) or "LSL-Skript exportiert. Notecard wird beim Textur-Speichern erzeugt.")
 	except FileNotFoundError as e:
 		error_msg = f"Could not save LSL script: {file}"
 		logger.error(error_msg, exc_info=True)
-		messagebox.showerror("Fehler", str(e))
-		raise LSLExportError(error_msg) from e
+		if hasattr(self, 'status') and self.status:
+			self.status.config(text=f"LSL-Export fehlgeschlagen: {e}")
+		return
 	except IOError as e:
 		error_msg = f"IO error when saving LSL script: {file}"
 		logger.error(error_msg, exc_info=True)
-		messagebox.showerror("Fehler", str(e))
-		raise LSLExportError(error_msg) from e
+		if hasattr(self, 'status') and self.status:
+			self.status.config(text=f"LSL-Export fehlgeschlagen: {e}")
+		return
 	except Exception as e:
 		error_msg = f"Error exporting LSL script: {str(e)}"
 		logger.error(error_msg, exc_info=True)
-		messagebox.showerror("Fehler", str(e))
-		raise LSLExportError(error_msg) from e
-
-def export_lsl_legacy(self: Any) -> None:
-	"""Exportiert das Legacy-LSL-Script (nur ; Format) für Abwärtskompatibilität."""
-	if not self.gif_frames:
-		messagebox.showerror("Fehler", "Kein GIF geladen.")
-		return
-	logger.info("Starting legacy LSL script export")
-	frame_count = self.frame_count
-	tiles_x, tiles_y = calculate_optimal_grid(frame_count, prefer_single_row_odd=_prefer_single_row_odd(self))
-	name = "texture"
-	if self.gif_image and hasattr(self.gif_image, 'filename'):
-		name = os.path.splitext(os.path.basename(self.gif_image.filename))[0]
-	speed = 10.0
-	lsl = generate_lsl_script_legacy(self, name, tiles_x, tiles_y, speed)
-	file = filedialog.asksaveasfilename(
-		defaultextension=".lsl",
-		initialfile=f"{name}_legacy.lsl",
-		filetypes=[("LSL", "*.lsl"), ("Text", "*.txt")]
-	)
-	if not file:
-		logger.debug("Legacy LSL export cancelled by user")
-		return
-	logger.info(f"Saving legacy LSL script to: {file}")
-	try:
-		with open(file, "w", encoding="utf-8") as f:
-			f.write(lsl)
-		logger.info(f"Legacy LSL script exported successfully: {file}")
 		if hasattr(self, 'status') and self.status:
-			self.status.config(text=tr('status_lsl_exported', self.lang) or "LSL-Skript exportiert.")
-	except FileNotFoundError as e:
-		error_msg = f"Could not save legacy LSL script: {file}"
-		logger.error(error_msg, exc_info=True)
-		messagebox.showerror("Fehler", str(e))
-		raise LSLExportError(error_msg) from e
-	except IOError as e:
-		error_msg = f"IO error when saving legacy LSL script: {file}"
-		logger.error(error_msg, exc_info=True)
-		messagebox.showerror("Fehler", str(e))
-		raise LSLExportError(error_msg) from e
-	except Exception as e:
-		error_msg = f"Error exporting legacy LSL script: {str(e)}"
-		logger.error(error_msg, exc_info=True)
-		messagebox.showerror("Fehler", str(e))
-		raise LSLExportError(error_msg) from e
+			self.status.config(text=f"LSL-Export fehlgeschlagen: {e}")
+		return
 
 def _get_app_version() -> str:
 	"""Liefert die App-Version ohne harten Modulimport zur Import-Zeit (verhindert Circular Imports)."""
@@ -700,8 +670,28 @@ def _get_app_version() -> str:
 	return "2.2.0"
 
 def generate_lsl_script(self: Any, name: str, tiles_x: int, tiles_y: int, speed: float) -> str:
-	"""Kompatibilitäts-Wrapper: liefert das Legacy-LSL-Script."""
-	return generate_lsl_script_legacy(self, name, tiles_x, tiles_y, speed)
+	"""Kompatibilitäts-Wrapper: liefert das universelle Notecard-LSL-Script."""
+	return generate_lsl_script_v2(self, name, tiles_x, tiles_y, speed)
+
+def generate_lsl_notecard(name: str, tiles_x: int, tiles_y: int, speed: float, effect_tokens: list[str], movement_token: str) -> str:
+	version = _get_app_version()
+	created_at = datetime.now().strftime("%Y-%m-%d")
+	effects = ", ".join(effect_tokens) if effect_tokens else "LOOP"
+	movement = movement_token if movement_token in {"SLIDE", "ROTATE", "SCALE"} else "SLIDE"
+	return f'''# OSSL2Gif {version}
+# Copyright (c) 2026 Manfred Zainhofer
+# Generated: {created_at}
+# Texture Notecard: {name}.notecard
+
+columns={tiles_x}
+rows={tiles_y}
+fps={speed}
+start=0.0
+effects={effects}
+movement={movement}
+face=ALL_SIDES
+animOn=TRUE
+'''
 
 def _get_lsl_default_effect_tokens(self: Any) -> list[str]:
 	effects: list[str] = []
@@ -723,9 +713,9 @@ def _get_lsl_default_movement(self: Any) -> str:
 	return "SLIDE"
 
 def generate_lsl_script_v2(self: Any, name: str, tiles_x: int, tiles_y: int, speed: float) -> str:
-	"""Generiert ein erweitertes LSL-Script mit Semikolon- und Unterstrich-Kompatibilität."""
+	"""Generiert ein universelles LSL-Script, das Parameter aus einer Notecard liest."""
 	version = _get_app_version()
-	length = tiles_x * tiles_y
+	created_at = datetime.now().strftime("%Y-%m-%d")
 	default_effects = _get_lsl_default_effect_tokens(self)
 	default_effects_lsl = ", ".join(default_effects) if default_effects else "LOOP"
 	default_movement = _get_lsl_default_movement(self)
@@ -735,10 +725,11 @@ def generate_lsl_script_v2(self: Any, name: str, tiles_x: int, tiles_y: int, spe
 		"SCALE": "SCALE",
 	}
 	default_movement_lsl = movement_map.get(default_movement, "0")
-	return f'''// LSL Texture Animation Script (Enhanced)
+	return f'''// Texture-Animation-Script.lsl
 // Generated by OSSL2Gif {version}
-// Legacy format: {name};{tiles_x};{tiles_y};{speed}
-// New format: {name}_{tiles_x}_{tiles_y}_{speed}_0_{'_'.join(default_effects)}_{default_movement}
+// Copyright (c) 2026 Manfred Zainhofer
+// Generated: {created_at}
+// Universal: supports legacy texture names and multiple *.notecard playlists
 
 integer animOn = TRUE;
 list defaultEffects = [{default_effects_lsl}];
@@ -748,144 +739,339 @@ integer face = ALL_SIDES;
 integer sideX = {tiles_x};
 integer sideY = {tiles_y};
 float start = 0.0;
-float length = {length};
+float length = (float)({tiles_x} * {tiles_y});
 float speed = {speed};
+string activeTexture = "{name}";
 
-list buildEffects(list tokens)
+list playlistCards = [];
+integer playlistIndex = 0;
+string activeNotecard = "";
+
+key notecardQuery;
+integer notecardLine = 0;
+
+string trimString(string value)
 {{
-	integer i;
-	list resolved = [];
-	integer count = llGetListLength(tokens);
-
-	for(i = 0; i < count; i++)
-	{{
-		string token = llToUpper(llStringTrim(llList2String(tokens, i), STRING_TRIM));
-		if(token == "PING" && (i + 1) < count)
-		{{
-			string nextToken = llToUpper(llStringTrim(llList2String(tokens, i + 1), STRING_TRIM));
-			if(nextToken == "PONG")
-			{{
-				resolved += [PING_PONG];
-				i++;
-				jump continue_effects;
-			}}
-		}}
-		if(token == "LOOP")
-			resolved += [LOOP];
-		else if(token == "SMOOTH")
-			resolved += [SMOOTH];
-		else if(token == "REVERSE")
-			resolved += [REVERSE];
-		else if(token == "PING_PONG")
-			resolved += [PING_PONG];
-
-		@continue_effects;
-	}}
-
-	if(llGetListLength(resolved) == 0)
-	{{
-		return defaultEffects;
-	}}
-	return resolved;
+	return llStringTrim(value, STRING_TRIM);
 }}
 
-integer buildMovement(list tokens)
+integer isDigit(string c)
 {{
-	integer i;
-	integer count = llGetListLength(tokens);
+	return (c == "0" || c == "1" || c == "2" || c == "3" || c == "4" || c == "5" || c == "6" || c == "7" || c == "8" || c == "9");
+}}
 
-	for(i = 0; i < count; i++)
+integer isNumeric(string value)
+{{
+	string t = trimString(value);
+	integer len = llStringLength(t);
+	if(len == 0) return FALSE;
+
+	integer dotSeen = FALSE;
+	integer i;
+	for(i = 0; i < len; i++)
 	{{
-		string token = llToUpper(llStringTrim(llList2String(tokens, i), STRING_TRIM));
-		if(token == "ROTATE")
-			return ROTATE;
-		if(token == "SCALE")
-			return SCALE;
-		if(token == "SLIDE")
-			return 0;
+		string c = llGetSubString(t, i, i);
+		if(c == ".")
+		{{
+			if(dotSeen) return FALSE;
+			dotSeen = TRUE;
+		}}
+		else if(c == "-")
+		{{
+			if(i != 0) return FALSE;
+		}}
+		else if(!isDigit(c))
+		{{
+			return FALSE;
+		}}
 	}}
+	return TRUE;
+}}
+
+integer parseMovement(string value)
+{{
+	string token = llToUpper(trimString(value));
+	if(token == "ROTATE") return ROTATE;
+	if(token == "SCALE") return SCALE;
+	if(token == "SLIDE") return 0;
 	return defaultMovement;
 }}
 
-initAnim(list effects, integer movement)
+integer parseFace(string value)
 {{
-	if(animOn)
+	string token = llToUpper(trimString(value));
+	if(token == "ALL" || token == "ALL_SIDES") return ALL_SIDES;
+	return (integer)token;
+}}
+
+list parseEffects(string value)
+{{
+	list tokens = llParseString2List(llToUpper(value), [",", ";", "|", " "], []);
+	list resolved = [];
+	integer i;
+	for(i = 0; i < llGetListLength(tokens); i++)
 	{{
-		integer effectBits = 0;
-		integer i;
-		for(i = 0; i < llGetListLength(effects); i++)
-		{{
-			effectBits = effectBits | llList2Integer(effects, i);
-		}}
-		llSetTextureAnim(ANIM_ON | effectBits | movement, face, sideX, sideY, start, length, speed);
+		string token = trimString(llList2String(tokens, i));
+		if(token == "LOOP") resolved += [LOOP];
+		else if(token == "SMOOTH") resolved += [SMOOTH];
+		else if(token == "REVERSE") resolved += [REVERSE];
+		else if(token == "PING_PONG" || token == "PINGPONG") resolved += [PING_PONG];
 	}}
-	else
+	if(llGetListLength(resolved) == 0) return defaultEffects;
+	return resolved;
+}}
+
+integer isNotecardConfig(string cardName)
+{{
+	string n = llToLower(trimString(cardName));
+	integer end = llStringLength(n) - 1;
+	if(end < 8) return FALSE;
+	return (llGetSubString(n, end - 8, end) == ".notecard");
+}}
+
+string notecardToTexture(string cardName)
+{{
+	integer end = llStringLength(cardName) - 10;
+	if(end < 0) return "";
+	return llGetSubString(cardName, 0, end);
+}}
+
+list collectNotecardPlaylist()
+{{
+	list cards = [];
+	integer i;
+	integer count = llGetInventoryNumber(INVENTORY_NOTECARD);
+	for(i = 0; i < count; i++)
 	{{
-		llSetTextureAnim(0, face, sideX, sideY, start, length, speed);
+		string card = llGetInventoryName(INVENTORY_NOTECARD, i);
+		if(isNotecardConfig(card)) cards += [card];
+	}}
+	return cards;
+}}
+
+resetConfigDefaults()
+{{
+	sideX = {tiles_x};
+	sideY = {tiles_y};
+	start = 0.0;
+	speed = {speed};
+	face = ALL_SIDES;
+	length = (float)(sideX * sideY);
+}}
+
+float getSwitchInterval()
+{{
+	float interval = 1.0;
+	if(speed > 0.0) interval = length / speed;
+	if(interval < 0.2) interval = 0.2;
+	return interval;
+}}
+
+stopAnim()
+{{
+	llSetTextureAnim(FALSE, face, 0, 0, 0.0, 0.0, 0.0);
+}}
+
+startAnim(list effects, integer movement)
+{{
+	if(!animOn)
+	{{
+		stopAnim();
+		llSetTimerEvent(0.0);
+		return;
+	}}
+
+	integer effectBits = 0;
+	integer i;
+	for(i = 0; i < llGetListLength(effects); i++)
+	{{
+		effectBits = effectBits | llList2Integer(effects, i);
+	}}
+	llSetTextureAnim(ANIM_ON | effectBits | movement, face, sideX, sideY, start, length, speed);
+
+	if(llGetListLength(playlistCards) > 1)
+		llSetTimerEvent(getSwitchInterval());
+	else
+		llSetTimerEvent(0.0);
+}}
+
+applyConfig(list effects, integer movement)
+{{
+	if(activeTexture == "")
+	{{
+		activeTexture = llGetInventoryName(INVENTORY_TEXTURE, 0);
+	}}
+
+	if(activeTexture == "" || llGetInventoryType(activeTexture) != INVENTORY_TEXTURE)
+	{{
+		llOwnerSay("Keine passende Textur im Inventar gefunden.");
+		stopAnim();
+		return;
+	}}
+
+	if(sideX < 1) sideX = 1;
+	if(sideY < 1) sideY = 1;
+	if(speed <= 0.0) speed = 1.0;
+	length = (float)(sideX * sideY);
+	llSetTexture(activeTexture, face);
+	startAnim(effects, movement);
+}}
+
+parseConfigLine(string line)
+{{
+	string cleaned = trimString(line);
+	if(cleaned == "") return;
+	if(llGetSubString(cleaned, 0, 0) == "#") return;
+	if(llGetSubString(cleaned, 0, 1) == "//") return;
+
+	integer eq = llSubStringIndex(cleaned, "=");
+	if(eq == -1) return;
+
+	string cfgKey = llToLower(trimString(llGetSubString(cleaned, 0, eq - 1)));
+	string cfgValue = trimString(llGetSubString(cleaned, eq + 1, -1));
+
+	if(cfgKey == "columns" || cfgKey == "tiles_x" || cfgKey == "sidex") sideX = (integer)cfgValue;
+	else if(cfgKey == "rows" || cfgKey == "tiles_y" || cfgKey == "sidey") sideY = (integer)cfgValue;
+	else if(cfgKey == "fps" || cfgKey == "speed" || cfgKey == "rate") speed = (float)cfgValue;
+	else if(cfgKey == "start") start = (float)cfgValue;
+	else if(cfgKey == "effects") defaultEffects = parseEffects(cfgValue);
+	else if(cfgKey == "movement") defaultMovement = parseMovement(cfgValue);
+	else if(cfgKey == "face") face = parseFace(cfgValue);
+	else if(cfgKey == "animon")
+	{{
+		string b = llToUpper(cfgValue);
+		animOn = (b == "TRUE" || b == "1" || b == "YES" || b == "ON");
 	}}
 }}
 
-fetch()
+parseLegacyTextureName(string textureName)
 {{
-	string texture = llGetInventoryName(INVENTORY_TEXTURE, 0);
-	if(texture == "")
+	list tokens = llParseString2List(textureName, ["_"], []);
+	integer count = llGetListLength(tokens);
+	integer i;
+	integer startIndex = -1;
+
+	for(i = 0; i <= count - 4; i++)
+	{{
+		if(isNumeric(llList2String(tokens, i)) && isNumeric(llList2String(tokens, i + 1)) && isNumeric(llList2String(tokens, i + 2)) && isNumeric(llList2String(tokens, i + 3)))
+		{{
+			startIndex = i;
+			jump found_legacy;
+		}}
+	}}
+
+	@found_legacy;
+	if(startIndex == -1) return;
+
+	sideX = (integer)llList2String(tokens, startIndex);
+	sideY = (integer)llList2String(tokens, startIndex + 1);
+	speed = (float)llList2String(tokens, startIndex + 2);
+	start = (float)llList2String(tokens, startIndex + 3);
+
+	list parsedEffects = [];
+	integer parsedMovement = defaultMovement;
+	for(i = startIndex + 4; i < count; i++)
+	{{
+		string token = llToUpper(trimString(llList2String(tokens, i)));
+		if(token == "ROTATE" || token == "SCALE" || token == "SLIDE")
+		{{
+			parsedMovement = parseMovement(token);
+		}}
+		else if(token == "LOOP") parsedEffects += [LOOP];
+		else if(token == "SMOOTH") parsedEffects += [SMOOTH];
+		else if(token == "REVERSE") parsedEffects += [REVERSE];
+		else if(token == "PING_PONG" || token == "PINGPONG") parsedEffects += [PING_PONG];
+	}}
+
+	if(llGetListLength(parsedEffects) > 0) defaultEffects = parsedEffects;
+	defaultMovement = parsedMovement;
+}}
+
+loadNotecard(integer index)
+{{
+	integer count = llGetListLength(playlistCards);
+	if(count == 0) return;
+
+	if(index < 0) index = 0;
+	if(index >= count) index = 0;
+	playlistIndex = index;
+
+	activeNotecard = llList2String(playlistCards, playlistIndex);
+	activeTexture = notecardToTexture(activeNotecard);
+	resetConfigDefaults();
+	notecardLine = 0;
+	notecardQuery = llGetNotecardLine(activeNotecard, notecardLine);
+}}
+
+loadCurrentAnimation()
+{{
+	playlistCards = collectNotecardPlaylist();
+	if(llGetListLength(playlistCards) > 0)
+	{{
+		loadNotecard(playlistIndex);
 		return;
-
-	llSetTexture(texture, face);
-
-	list raw = llParseStringKeepNulls(texture, [".", ";", "_"], []);
-
-	if(llGetListLength(raw) < 4)
-	{{
-		llOwnerSay("Ungültiges Texturformat. Erwartet: name;X;Y;FPS oder name_X_Y_FPS_...");
-		return;
 	}}
 
-	sideX = (integer)llList2String(raw, 1);
-	sideY = (integer)llList2String(raw, 2);
-	speed = (float)llList2String(raw, 3);
-
-	if(llGetListLength(raw) > 4)
+	resetConfigDefaults();
+	activeTexture = llGetInventoryName(INVENTORY_TEXTURE, 0);
+	if(activeTexture != "")
 	{{
-		start = (float)llList2String(raw, 4);
+		parseLegacyTextureName(activeTexture);
 	}}
-	else
-	{{
-		start = 0.0;
-	}}
-
-	length = (float)(sideX * sideY);
-
-	list optionalTokens = llList2List(raw, 5, -1);
-	list effects = buildEffects(optionalTokens);
-	integer movement = buildMovement(optionalTokens);
-
-	if(sideX > 0 && sideY > 0)
-	{{
-		initAnim(effects, movement);
-	}}
+	applyConfig(defaultEffects, defaultMovement);
 }}
 
 default
 {{
 	state_entry()
 	{{
-		llSetTextureAnim(FALSE, face, 0, 0, 0.0, 0.0, 1.0);
-		fetch();
+		stopAnim();
+		loadCurrentAnimation();
+	}}
+
+	on_rez(integer start_param)
+	{{
+		llResetScript();
 	}}
 
 	changed(integer what)
 	{{
 		if(what & CHANGED_INVENTORY)
 		{{
-			fetch();
+			playlistIndex = 0;
+			loadCurrentAnimation();
 		}}
+	}}
+
+	dataserver(key query_id, string data)
+	{{
+		if(query_id != notecardQuery) return;
+
+		if(data != EOF)
+		{{
+			parseConfigLine(data);
+			notecardLine++;
+			notecardQuery = llGetNotecardLine(activeNotecard, notecardLine);
+		}}
+		else
+		{{
+			applyConfig(defaultEffects, defaultMovement);
+		}}
+	}}
+
+	timer()
+	{{
+		if(!animOn) return;
+		if(llGetListLength(playlistCards) <= 1) return;
+		playlistIndex++;
+		if(playlistIndex >= llGetListLength(playlistCards)) playlistIndex = 0;
+		loadNotecard(playlistIndex);
+	}}
+
+	touch_start(integer total_number)
+	{{
+		animOn = !animOn;
+		applyConfig(defaultEffects, defaultMovement);
 	}}
 }}
 '''
-
-def generate_lsl_script_legacy(self: Any, name: str, tiles_x: int, tiles_y: int, speed: float) -> str:
-	"""Generiert ein LSL-Script für Texture-Animation mit den gegebenen Parametern."""
-	version = _get_app_version()
-	length = tiles_x * tiles_y
-	return f'''// LSL Texture Animation Script\n// Generated by OSSL2Gif {version}\n// Texture: {name};{tiles_x};{tiles_y};{speed}\n\ninteger animOn = TRUE;\nlist effects = [LOOP];\ninteger movement = 0;\ninteger face = ALL_SIDES;\ninteger sideX = {tiles_x};\ninteger sideY = {tiles_y};\nfloat start = 0.0;\nfloat length = {length};\nfloat speed = {speed};\n\ninitAnim() {{\n    if(animOn) {{\n        integer effectBits;\n        integer i;\n        for(i = 0; i < llGetListLength(effects); i++) {{\n            effectBits = (effectBits | llList2Integer(effects,i));\n        }}\n        integer params = (effectBits|movement);\n        llSetTextureAnim(ANIM_ON|params,face,sideX,sideY,start,length,speed);\n    }}\n    else {{\n        llSetTextureAnim(0,face,sideX,sideY,start,length,speed);\n    }}\n}}\n\nfetch() {{\n     string texture = llGetInventoryName(INVENTORY_TEXTURE,0);\n            llSetTexture(texture,face);\n            // llParseString2List braucht als Trennzeichen eine Liste!\n            list data  = llParseString2List(texture,[";"],[]);\n            string X = llList2String(data,1);\n            string Y = llList2String(data,2);\n            string Z = llList2String(data,3);\n            sideX = (integer) X;\n            sideY = (integer) Y;\n            speed = (float) Z;\n            length = (float)(sideX * sideY);\n            if (speed) \n                initAnim();\n}}\n\ndefault\n{{\n    state_entry()\n    {{\n        llSetTextureAnim(FALSE, face, 0, 0, 0.0, 0.0, 1.0);\n        fetch();\n    }}\n    changed(integer what)\n    {{\n        if (what & CHANGED_INVENTORY)\n        {{\n            fetch();\n        }}\n    }}\n}}\n'''

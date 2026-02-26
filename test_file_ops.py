@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 from typing import Any, Optional
+import os
+import tempfile
 from PIL import Image
 import file_ops
 
@@ -64,7 +66,7 @@ class TestFileOps(unittest.TestCase):
         self.assertIsNotNone(app.texture_image)
 
     @patch("file_ops.filedialog.asksaveasfilename", return_value=None)
-    def test_save_texture_uses_new_underscore_filename_format(self, mock_dialog):
+    def test_save_texture_uses_plain_base_filename(self, mock_dialog):
         app = DummyApp()
         app.framerate_var = MagicMock(get=MagicMock(return_value=10))
         gif_stub = type("GifStub", (), {"filename": "Feuer.gif"})()
@@ -72,25 +74,49 @@ class TestFileOps(unittest.TestCase):
         file_ops.save_texture(app)
         self.assertTrue(mock_dialog.called)
         initialfile = mock_dialog.call_args.kwargs.get("initialfile", "")
-        self.assertTrue(initialfile.startswith("Feuer_1_1_10_0_LOOP_SMOOTH_ROTATE"))
-        self.assertTrue(initialfile.endswith(".png"))
+        self.assertEqual(initialfile, "Feuer.png")
 
     def test_generate_lsl_script_enhanced_contains_new_format_and_flags(self):
         app = DummyApp()
         script = file_ops.generate_lsl_script_v2(app, "Feuer", 4, 3, 10.0)
-        self.assertIn("New format: Feuer_4_3_10.0_0_LOOP_SMOOTH_ROTATE", script)
+        self.assertIn("Texture-Animation-Script.lsl", script)
         self.assertIn("list defaultEffects = [LOOP, SMOOTH];", script)
         self.assertIn("integer defaultMovement = ROTATE;", script)
-        self.assertIn("llParseStringKeepNulls(texture, [\".\", \";\", \"_\"], []);", script)
-        self.assertIn("if(token == \"PING\" && (i + 1) < count)", script)
-        self.assertIn("if(nextToken == \"PONG\")", script)
-        self.assertIn("resolved += [PING_PONG];", script)
+        self.assertIn("collectNotecardPlaylist()", script)
+        self.assertIn("parseLegacyTextureName", script)
+        self.assertIn("dataserver(key query_id, string data)", script)
+        self.assertIn("parseConfigLine(data);", script)
 
-    def test_generate_lsl_script_legacy_kept(self):
+    def test_generate_lsl_notecard_contains_values(self):
+        content = file_ops.generate_lsl_notecard("Feuer", 4, 3, 10.0, ["LOOP", "SMOOTH"], "ROTATE")
+        self.assertIn("columns=4", content)
+        self.assertIn("rows=3", content)
+        self.assertIn("fps=10.0", content)
+        self.assertIn("effects=LOOP, SMOOTH", content)
+        self.assertIn("movement=ROTATE", content)
+        self.assertIn("Texture Notecard: Feuer.notecard", content)
+
+    def test_save_texture_creates_notecard_named_like_texture(self):
         app = DummyApp()
-        script = file_ops.generate_lsl_script_legacy(app, "Feuer", 4, 3, 10.0)
-        self.assertIn("// Texture: Feuer;4;3;10.0", script)
-        self.assertIn("llParseString2List(texture,[\";\"],[]);", script)
+        app.framerate_var = MagicMock(get=MagicMock(return_value=10))
+        with tempfile.TemporaryDirectory() as tmpdir:
+            texture_path = os.path.join(tmpdir, "bildname2.png")
+            with patch("file_ops.filedialog.asksaveasfilename", return_value=texture_path):
+                file_ops.save_texture(app)
+            self.assertTrue(os.path.exists(texture_path))
+            self.assertTrue(os.path.exists(os.path.join(tmpdir, "bildname2.notecard")))
+
+    def test_export_lsl_does_not_create_notecard(self):
+        app = DummyApp()
+        app.framerate_var = MagicMock(get=MagicMock(return_value=10))
+        gif_stub = type("GifStub", (), {"filename": "bildname.gif"})()
+        app.gif_image = gif_stub
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script_path = os.path.join(tmpdir, "Texture-Animation-Script.lsl")
+            with patch("file_ops.filedialog.asksaveasfilename", return_value=script_path):
+                file_ops.export_lsl(app)
+            self.assertTrue(os.path.exists(script_path))
+            self.assertFalse(os.path.exists(os.path.join(tmpdir, "bildname.notecard")))
 
 if __name__ == "__main__":
     unittest.main()

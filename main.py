@@ -15,7 +15,7 @@ from config import load_config, save_config
 from translations import tr
 from gui_layout import build_layout, create_effects_panel, normalize_label_text
 from image_processing import apply_effects, show_gif_frame, show_texture
-from file_ops import load_gif, save_gif, save_texture, load_texture, export_lsl, export_lsl_legacy
+from file_ops import load_gif, save_gif, save_texture, load_texture, export_lsl
 from events import reset_settings, change_language, on_maxframes_changed, add_selected_frame_to_texture, choose_bg_color, set_transparent_bg, on_bg_transparency_changed, apply_background_from_config
 from logging_config import get_logger
 try:
@@ -84,7 +84,7 @@ except Exception as e:
     DEFAULT_LANGUAGE = 'unknown'
 
 LANGUAGES = ['de', 'en', 'fr', 'es', 'it', 'ru', 'nl', 'se', 'pl', 'pt', 'uk', 'ja', 'zh']
-Version = "2.2.0"
+Version = "2.3.0"
 
 # ============================================================================
 # FENSTERGRÖSSENEINSTELLUNGEN - HIER KÖNNEN WERTE MANUELL ANGEPASST WERDEN
@@ -1509,9 +1509,6 @@ Python {'.'.join(map(str, __import__('sys').version_info[:3]))}
 
     def export_lsl(self):
         export_lsl(self)
-
-    def export_lsl_legacy(self):
-        export_lsl_legacy(self)
 
     def generate_lsl_script(self, name, tiles_x, tiles_y, speed):
         from file_ops import generate_lsl_script

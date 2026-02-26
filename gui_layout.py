@@ -180,12 +180,8 @@ def create_menubar(self):
 	script_menu.config(bg='#2d2d2d', fg='#ffffff', activebackground='#4a4a4a', activeforeground='#ffffff')  # type: ignore
 
 	script_menu.add_command(
-		label=f"🧾 {tr('export_lsl', self.lang) or 'LSL exportieren'} (Enhanced)",
+		label=f"🧾 {tr('export_lsl', self.lang) or 'LSL exportieren'}",
 		command=self.export_lsl
-	)
-	script_menu.add_command(
-		label="📜 LSL exportieren (Legacy)",
-		command=self.export_lsl_legacy
 	)
 	script_menu.add_separator()
 
