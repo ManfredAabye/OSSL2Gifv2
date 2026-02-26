@@ -1,9 +1,15 @@
 
-# OSSL2Gif – GIF zu Textur Konverter (Version 2.1.3)
+# OSSL2Gif – GIF zu Textur Konverter (Version 2.3.0)
 
-Mit OSSL2Gif 2.1.3 wandelst du animierte GIFs komfortabel in Texturen für Second Life/OpenSim um – jetzt mit vielen neuen Features und moderner Oberfläche!
+Mit OSSL2Gif 2.3.0 wandelst du animierte GIFs komfortabel in Texturen für Second Life/OpenSim um – inklusive universellem LSL-Workflow mit texturnamenbasierter Notecard.
 
-## Was ist neu in 2.1.3?
+## Was ist neu in 2.3.0?
+
+- **Universelles LSL-Skript:** Der Export nutzt durchgängig `Texture-Animation-Script.lsl`.
+- **Notecard pro Texturname:** Beim Speichern der Textur wird automatisch `<texturname>.notecard` erzeugt (z. B. `bildname2.notecard`).
+- **Mehrere Notecards:** Das Skript kann mehrere `*.notecard` im Prim nacheinander abspielen.
+- **Legacy-Kompatibilität:** Alte Textur-Namensmuster werden weiterhin als Fallback gelesen.
+- **Status statt Popup:** Wichtige Datei-/Exportmeldungen erscheinen in der Statuszeile.
 
 - **Einzelne Bilder entfernen:** Über den neuen "Entfernen"-Button kannst du gezielt einzelne Frames aus der GIF-Liste löschen.
 - **Max. Bilder:** Die maximale Bildanzahl ist einstellbar. Überschüssige Bilder werden automatisch entfernt.
@@ -252,36 +258,32 @@ Diese Effekte werden auf die finale Textur angewendet:
    - **PNG:** Unterstützt Transparenz (empfohlen)
    - **JPG:** Kompakter, keine Transparenz
    - **BMP:** Unkomprimiert
-3. Gib einen Dateinamen ein (automatisch vorgeschlagen: `name;columns;rows;speed.png`)
-4. Speichern → Fertig!
+3. Gib einen Dateinamen ein (z. B. `bildname2.png`)
+4. Speichern → Fertig! Zusätzlich wird automatisch `bildname2.notecard` erzeugt.
 
-**Dateinamen-Format:**
+**Dateiname:**
 
-```bash
-beispiel;4;3;100.png
-```
-
-- `beispiel`: Name der Animation
-- `4`: Anzahl Spalten (Tiles X)
-- `3`: Anzahl Zeilen (Tiles Y)
-- `100`: Geschwindigkeit (FPS-Info für LSL)
+Der Textur-Dateiname ist frei wählbar. Die Notecard wird mit exakt diesem Texturnamen erstellt (`<texturname>.notecard`).
 
 ![Screenshot: Speichern-Dialog](docs/screenshots/08_speichern.png)
 
 ### Schritt 10: LSL-Skript exportieren
 
 1. Klicke auf **"LSL exportieren"**
-2. Ein LSL-Skript wird generiert mit all deinen Einstellungen
-3. Speichere das Skript als `.lsl`-Datei
-4. Importiere es in Second Life/OpenSim
+2. Es wird das universelle LSL-Skript `Texture-Animation-Script.lsl` erzeugt
+3. Die passende Notecard entsteht beim **Textur speichern** als `<texturname>.notecard`
+4. Lege Skript + Textur + Notecard ins Prim-Inventar
+5. Du kannst mehrere `*.notecard` einfügen (z. B. `fire.notecard`, `smoke.notecard`)
+6. Das Skript spielt mehrere Notecards nacheinander ab
+7. Importiere es in Second Life/OpenSim
 
 **LSL-Skript nutzen:**
 
 ```lsl
 // Das Skript liest automatisch:
-// - Texturname aus dem Inventar
-// - Spalten/Zeilen aus dem Dateinamen
-// - Geschwindigkeit aus dem Dateinamen
+// - Spalten/Zeilen/FPS aus <texturname>.notecard
+// - Effekte und Bewegung aus der Notecard
+// - bei fehlender Notecard Legacy-Werte aus altem Texturnamen
 ```
 
 ![Screenshot: LSL-Export](docs/screenshots/09_lsl_export.png)
@@ -308,17 +310,23 @@ Du hast eine `fire-animation.gif` mit 20 Frames und möchtest daraus eine Textur
 ### Ablauf
 
 1. **Start:** `python start.py`
+
 2. **Laden:** GIF laden → `fire-animation.gif` auswählen
+
 3. **Prüfen:** Animation mit Play-Button testen
+
 4. **Anpassen:**
    - Textur-Effekte → Farbintensität auf 1.2 erhöhen (lebendigere Flammen)
    - Hintergrundfarbe → Vollständig transparent lassen
+
 5. **Optimieren:**
    - Max. Bilder → auf 16 reduzieren (für bessere Performance in SL)
    - Größe → 1024×1024 wählen (passt für Standard-Account)
+
 6. **Speichern:**
-   - Textur speichern als `fire;4;4;50.png`
+   - Textur speichern als `fire_texture.png`
    - LSL exportieren als `fire-animation.lsl`
+
 7. **In Second Life:**
    - Textur hochladen
    - In ein Prim einfügen
@@ -339,7 +347,7 @@ Du hast eine `fire-animation.gif` mit 20 Frames und möchtest daraus eine Textur
 
 - **Texturgröße:** Standard-Accounts sind auf 1024×1024 limitiert
 - **Transparenz:** Nutze PNG-Format für transparente Bereiche
-- **Animation:** Die Geschwindigkeit im Dateinamen ist ein Hinweis für LSL (nicht bindend)
+- **Animation:** Geschwindigkeit/Tile-Parameter werden aus `<texturname>.notecard` gelesen (mehrere Notecards werden der Reihe nach abgespielt).
 - **Upload-Kosten:** Größere Texturen kosten mehr L$ beim Upload
 
 ### Qualität vs. Dateigröße
@@ -387,7 +395,7 @@ PyOSSL2Gif/
 └── requirements.txt      # Python-Abhängigkeiten
 ```
 
-### Neue Systemkomponenten (ab 2.1.3)
+### Neue Systemkomponenten (ab 2.3.0)
 
 - **Service-Initialisierung:** `app_bootstrap.py` registriert Services und schliesst sie sauber beim Beenden.
 - **Event Bus:** `event_bus.py` entkoppelt GUI, Processing und IO ueber Events.
@@ -933,4 +941,3 @@ python -m pytest test_*.py
 - 1.x: Grundfunktionen (GIF laden, speichern, Effekte, Export)
 
 ---
-
